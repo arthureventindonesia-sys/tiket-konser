@@ -8,7 +8,7 @@ import {
   type OrderStatus,
   type TicketTypeId,
 } from "@/lib/event";
-import { uniqueCodeFromWhatsapp } from "@/lib/format";
+import { toWaNumber, uniqueCodeFromWhatsapp } from "@/lib/format";
 import { remainingOf } from "@/lib/stages";
 import { getLiveStage } from "@/lib/stages.server";
 import { ensureAdminSeeded, findAgentByCode } from "@/lib/staff.server";
@@ -90,14 +90,29 @@ function toAdmin(pub: PublicOrder, row: OrderRow): AdminOrder {
   };
 }
 
-async function ownedCount(email: string, type: TicketTypeId): Promise<number> {
+let identitySchemaReady = false;
+async function ensureIdentitySchema(): Promise<void> {
+  if (identitySchemaReady) return;
   const sql = await getSql();
-  const col = type === "vvip" ? "qty_vvip" : type === "vip" ? "qty_vip" : "qty_festival";
-  const rows = await sql.query<{ total: number }>(
-    `select coalesce(sum(${col}), 0)::int as total from orders where lower(email) = lower($1)`,
-    [email],
-  );
-  return Number(rows[0]?.total ?? 0);
+  await sql.query("alter table orders add column if not exists whatsapp_norm text");
+  identitySchemaReady = true;
+}
+
+async function assertFreshIdentity(email: string, waNorm: string): Promise<void> {
+  await ensureIdentitySchema();
+  const sql = await getSql();
+  const byEmail = await sql<{ id: number }>`
+    select id from orders where lower(email) = ${email} limit 1
+  `;
+  if (byEmail[0]) {
+    throw new Error("Email ini sudah digunakan untuk pembelian tiket");
+  }
+  const byWa = await sql<{ id: number }>`
+    select id from orders where whatsapp_norm = ${waNorm} limit 1
+  `;
+  if (byWa[0]) {
+    throw new Error("Nomor WhatsApp ini sudah digunakan untuk pembelian tiket");
+  }
 }
 
 export async function createOrder(input: {
@@ -127,8 +142,11 @@ export async function createOrder(input: {
   if (waDigits.length < 10 || waDigits.length > 15) {
     throw new Error("Nomor WhatsApp tidak valid");
   }
+  const waNorm = toWaNumber(whatsapp);
   const totalQty = qty.vvip + qty.vip + qty.festival;
   if (totalQty < 1) throw new Error("Pilih minimal satu tiket");
+
+  await assertFreshIdentity(email, waNorm);
 
   const stage = await getLiveStage();
   if (!stage) throw new Error("Penjualan tiket sedang ditutup");
@@ -146,18 +164,8 @@ export async function createOrder(input: {
           : `Sisa kuota ${TICKET_LABEL[type]} tahap ${stage.label}: ${sisa}`,
       );
     }
-  }
-
-  for (const type of ["vvip", "vip", "festival"] as const) {
     if (qty[type] > MAX_PER_TYPE) {
-      throw new Error(`Maksimal ${MAX_PER_TYPE} tiket ${TICKET_LABEL[type]} per akun`);
-    }
-    const already = await ownedCount(email, type);
-    if (already + qty[type] > MAX_PER_TYPE) {
-      const sisa = Math.max(0, MAX_PER_TYPE - already);
-      throw new Error(
-        `Akun ini sudah memiliki ${already} tiket ${TICKET_LABEL[type]}. Sisa kuota: ${sisa}.`,
-      );
+      throw new Error(`Maksimal ${MAX_PER_TYPE} tiket ${TICKET_LABEL[type]} per pembelian`);
     }
   }
 
@@ -178,17 +186,29 @@ export async function createOrder(input: {
   const publicId = randomBytes(9).toString("base64url");
 
   const sql = await getSql();
-  const inserted = await sql<OrderRow>`
+  let inserted: OrderRow[];
+  try {
+    inserted = await sql<OrderRow>`
     insert into orders (
       public_id, email, full_name, address, whatsapp, referral_code,
-      qty_vvip, qty_vip, qty_festival, base_amount, unique_code, total_amount, status, stage_id
+      qty_vvip, qty_vip, qty_festival, base_amount, unique_code, total_amount, status, stage_id, whatsapp_norm
     ) values (
       ${publicId}, ${email}, ${fullName}, ${address}, ${whatsapp}, ${referral},
       ${qty.vvip}, ${qty.vip}, ${qty.festival}, ${baseAmount}, ${uniqueCode}, ${totalAmount},
-      ${"awaiting_payment"}, ${stage.id}
+      ${"awaiting_payment"}, ${stage.id}, ${waNorm}
     )
     returning *
   `;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("orders_email") || msg.includes("email")) {
+      throw new Error("Email ini sudah digunakan untuk pembelian tiket");
+    }
+    if (msg.includes("whatsapp")) {
+      throw new Error("Nomor WhatsApp ini sudah digunakan untuk pembelian tiket");
+    }
+    throw err;
+  }
   const row = inserted[0];
   if (!row) throw new Error("Gagal membuat pesanan");
   return toPublic(row, false);

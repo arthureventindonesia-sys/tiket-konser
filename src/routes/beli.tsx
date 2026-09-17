@@ -209,7 +209,10 @@ function BeliPage() {
                 </div>
               );
             })}
-            <p className="text-xs text-subtle">Maksimal {MAX_PER_TYPE} tiket per jenis, per email.</p>
+            <p className="text-xs text-subtle">
+              Maksimal {MAX_PER_TYPE} tiket per jenis. Email dan WhatsApp hanya bisa dipakai satu kali
+              pembelian.
+            </p>
           </div>
 
           <label className="flex items-start gap-3 rounded-lg border border-border bg-surface p-4 text-sm text-muted">
