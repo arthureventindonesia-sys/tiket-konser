@@ -196,9 +196,6 @@ function BeliPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-display text-lg leading-tight">{t.label}</p>
                     <p className="font-mono text-xs text-gold">{formatRupiah(priceOf(t.id))}</p>
-                    <p className="mt-0.5 text-xs text-subtle">
-                      {habis ? "Kuota habis" : `Sisa ${sisa}`}
-                    </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
