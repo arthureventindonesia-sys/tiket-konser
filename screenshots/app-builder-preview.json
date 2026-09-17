@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Golden Satya Fair",
+      "hasCanvas": false,
+      "bodyTextLen": 353,
+      "bodyTextHash": "bbddc59d1107211af69d5b9894036513e595aabebcfecb7ae991b99aef2dba5e",
+      "bodyTextPrefix": "Beli OFFICIAL TICKETING Sal Priadi · Bilal Indrajaya Senin, 9 No",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Golden Satya Fair",
+      "hasCanvas": false,
+      "bodyTextLen": 353,
+      "bodyTextHash": "bbddc59d1107211af69d5b9894036513e595aabebcfecb7ae991b99aef2dba5e",
+      "bodyTextPrefix": "Beli OFFICIAL TICKETING Sal Priadi · Bilal Indrajaya Senin, 9 No",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
