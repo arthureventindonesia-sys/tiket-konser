@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getStaffSession, staffLogin } from "@/lib/fn/staff";
+import { staffHome } from "@/lib/event";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -22,9 +23,7 @@ function LoginPage() {
     getStaffSession()
       .then((staff) => {
         if (staff) {
-          const to =
-            staff.role === "agent" ? "/admin/agen" : "/admin";
-          void navigate({ to });
+          void navigate({ to: staffHome(staff.role) });
         }
       })
       .finally(() => setChecking(false));
@@ -35,8 +34,7 @@ function LoginPage() {
     setBusy(true);
     try {
       const staff = await staffLogin({ data: { username, password } });
-      const to = staff.role === "agent" ? "/admin/agen" : "/admin";
-      await navigate({ to });
+      await navigate({ to: staffHome(staff.role) });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal masuk");
     } finally {

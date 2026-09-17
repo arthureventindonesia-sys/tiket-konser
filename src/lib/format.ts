@@ -71,3 +71,19 @@ export function fromDatetimeLocalWib(value: string): string | null {
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();
 }
+
+export function formatTakeoutStamp(value: string | Date): string {
+  const d = typeof value === "string" ? new Date(value) : value;
+  const opt = { timeZone: "Asia/Jakarta" } as const;
+  const weekday = new Intl.DateTimeFormat("id-ID", { ...opt, weekday: "long" }).format(d);
+  const day = new Intl.DateTimeFormat("id-ID", { ...opt, day: "numeric" }).format(d);
+  const month = new Intl.DateTimeFormat("id-ID", { ...opt, month: "long" }).format(d);
+  const year = new Intl.DateTimeFormat("id-ID", { ...opt, year: "numeric" }).format(d);
+  const time = new Intl.DateTimeFormat("id-ID", {
+    ...opt,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+  return `${weekday} - ${day} - ${month} - ${year} - ${time}`;
+}

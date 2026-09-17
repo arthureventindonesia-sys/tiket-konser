@@ -73,6 +73,10 @@ function BeliPage() {
       toast.error("Centang persetujuan sebelum checkout");
       return;
     }
+    if (!offer?.open) {
+      toast.error(offer?.message ?? "Penjualan tiket belum dimulai");
+      return;
+    }
     setBusy(true);
     try {
       const order = await placeOrder({
@@ -221,11 +225,12 @@ function BeliPage() {
               onCheckedChange={(v) => setAgreed(v === true)}
               className="mt-0.5"
             />
-            <span>
-              Saya menyatakan data di atas benar, tiket tidak dapat dikembalikan, dan saya setuju
-              membayar nominal yang tertera (harga tiket ditambah kode unik 3 digit terakhir WhatsApp)
-              melalui QRIS statis.
-            </span>
+            <ol className="list-decimal space-y-1 pl-4">
+              <li>Pastikan Email dan WhatsApp sudah benar dan AKTIF</li>
+              <li>Kesalahan dalam input data bukan tanggung jawab panitia</li>
+              <li>Refund tidak berlaku jika salah memasukkan nominal</li>
+              <li>Tiket yang sudah dibeli tidak dapat di-refund</li>
+            </ol>
           </label>
 
           <Button type="submit" size="lg" className="w-full" disabled={busy || !agreed || totalQty < 1 || !offer?.open}>

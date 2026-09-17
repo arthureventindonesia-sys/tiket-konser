@@ -76,7 +76,13 @@ export const TICKET_LABEL: Record<TicketTypeId, string> = {
 };
 
 export type OrderStatus = "awaiting_payment" | "awaiting_confirm" | "confirmed";
-export type StaffRole = "admin" | "crew" | "agent";
+export type StaffRole = "admin" | "crew" | "agent" | "tiketbox";
+
+export function staffHome(role: StaffRole): "/admin" | "/admin/agen" | "/admin/tiketbox" {
+  if (role === "agent") return "/admin/agen";
+  if (role === "tiketbox") return "/admin/tiketbox";
+  return "/admin";
+}
 
 export function qtyKey(type: TicketTypeId): "qty_vvip" | "qty_vip" | "qty_festival" {
   if (type === "vvip") return "qty_vvip";

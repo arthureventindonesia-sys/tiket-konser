@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, LogOut, Ticket, TicketCheck, Users, Share2 } from "lucide-react";
+import { LayoutDashboard, LogOut, ScanLine, Ticket, TicketCheck, Users, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getStaffSession, staffLogout } from "@/lib/fn/staff";
 import type { StaffRole } from "@/lib/event";
@@ -34,6 +34,9 @@ function AdminLayout() {
         if (s.role === "agent" && (pathname === "/admin" || pathname === "/admin/")) {
           void navigate({ to: "/admin/agen" });
         }
+        if (s.role === "tiketbox" && pathname !== "/admin/tiketbox") {
+          void navigate({ to: "/admin/tiketbox" });
+        }
       })
       .finally(() => setReady(true));
   }, [navigate, pathname]);
@@ -43,12 +46,12 @@ function AdminLayout() {
   }
 
   const links: {
-    to: "/admin" | "/admin/konfirmasi" | "/admin/tiketing" | "/admin/pengguna" | "/admin/agen";
+    to: "/admin" | "/admin/konfirmasi" | "/admin/tiketing" | "/admin/pengguna" | "/admin/agen" | "/admin/tiketbox";
     label: string;
     icon: typeof LayoutDashboard;
     exact: boolean;
   }[] = [];
-  if (staff.role !== "agent") {
+  if (staff.role === "admin" || staff.role === "crew") {
     links.push({ to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true });
     links.push({ to: "/admin/konfirmasi", label: "Konfirmasi", icon: TicketCheck, exact: false });
   }
@@ -56,16 +59,21 @@ function AdminLayout() {
     links.push({ to: "/admin/tiketing", label: "Tiketing", icon: Ticket, exact: false });
     links.push({ to: "/admin/pengguna", label: "Pengguna", icon: Users, exact: false });
   }
-  links.push({
-    to: "/admin/agen",
-    label: staff.role === "agent" ? "Transaksi" : "Agen",
-    icon: Share2,
-    exact: false,
-  });
+  if (staff.role !== "tiketbox") {
+    links.push({
+      to: "/admin/agen",
+      label: staff.role === "agent" ? "Transaksi" : "Agen",
+      icon: Share2,
+      exact: false,
+    });
+  }
+  if (staff.role === "admin" || staff.role === "tiketbox") {
+    links.push({ to: "/admin/tiketbox", label: "Tiketbox", icon: ScanLine, exact: false });
+  }
 
   return (
     <div className="min-h-dvh bg-bg md:grid md:grid-cols-[220px_1fr]">
-      <aside className="border-b border-border md:border-b-0 md:border-r">
+      <aside className="no-print border-b border-border md:border-b-0 md:border-r">
         <div className="flex items-center justify-between gap-3 px-4 py-4 md:block">
           <img src="/images/logo-gsf.png" alt="Golden Satya Fair" className="h-8 w-auto max-w-[160px] object-contain" />
           <p className="text-xs text-subtle md:mt-2">

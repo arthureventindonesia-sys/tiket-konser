@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { BuyButton } from "@/components/buy-button";
 import { EVENT, PARTNERS } from "@/lib/event";
 import { cn } from "@/lib/utils";
 
@@ -60,12 +61,7 @@ export function SiteHeader({ solid = false }: { solid?: boolean }) {
           <PartnerStrip className="hidden sm:flex" />
         </div>
         <nav className="flex shrink-0 items-center gap-2">
-          <Link
-            to="/beli"
-            className="inline-flex h-11 items-center rounded-md bg-gold px-5 text-sm font-semibold text-gold-fg"
-          >
-            Beli
-          </Link>
+          <BuyButton showArrow={false} className="h-11 px-5" />
         </nav>
       </div>
       <PartnerStrip className="mt-2.5 justify-center sm:hidden" imgClassName="h-5 max-w-[64px]" />

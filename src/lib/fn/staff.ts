@@ -32,3 +32,15 @@ export const createStaffUser = createServerFn({ method: "POST" })
     await requireStaff(["admin"]);
     return createStaffAccount(data);
   });
+
+export const deleteStaffUser = createServerFn({ method: "POST" })
+  .validator((input: { id: string }) => {
+    if (!input?.id) throw new Error("Akun tidak valid");
+    return { id: String(input.id) };
+  })
+  .handler(async ({ data }) => {
+    const { requireStaff, deleteStaffAccount } = await import("@/lib/staff.server");
+    const staff = await requireStaff(["admin"]);
+    await deleteStaffAccount(data.id, staff.id);
+    return { ok: true as const };
+  });

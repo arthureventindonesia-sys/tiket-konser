@@ -34,7 +34,26 @@ export type AdminOrder = PublicOrder & {
 export type DashboardData = {
   tickets: { vvip: number; vip: number; festival: number };
   revenue: number;
+  uniqueCodeTotal: number;
+  ticketRevenue: number;
   confirmedOrders: number;
   awaitingConfirm: number;
   awaitingPayment: number;
+};
+
+export type TicketboxRecord = {
+  orderId: number;
+  publicId: string;
+  fullName: string;
+  email: string;
+  whatsapp: string;
+  address: string;
+  qtyVvip: number;
+  qtyVip: number;
+  qtyFestival: number;
+  tickets: TicketCode[];
+  confirmedAt: string | null;
+  takenAt: string | null;
+  takenBy: string | null;
+  queriedCode: string;
 };

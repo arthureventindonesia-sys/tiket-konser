@@ -39,13 +39,6 @@
     color: var(--color-fg);
   }
 
-  body {
-    min-height: 100dvh;
-    background: var(--color-bg);
-    color: var(--color-fg);
-    font-family: var(--font-sans);
-  }
-
   h1,
   h2,
   h3 {
@@ -75,5 +68,23 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: #0c0a08 !important;
+  }
+
+  .print-sheet {
+    border: none !important;
+    background: white !important;
+    color: #0c0a08 !important;
+    box-shadow: none !important;
   }
 }

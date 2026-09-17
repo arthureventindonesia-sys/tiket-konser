@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { EVENT, TICKET_LABEL } from "@/lib/event";
@@ -16,6 +18,7 @@ function BayarPage() {
   const navigate = useNavigate();
   const [order, setOrder] = useState<PublicOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +38,23 @@ function BayarPage() {
       cancelled = true;
     };
   }, [orderId, navigate]);
+
+  async function copyNominal(amount: number) {
+    const text = String(amount);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      el.remove();
+    }
+    setCopied(true);
+    toast.success("Nominal disalin");
+    window.setTimeout(() => setCopied(false), 2000);
+  }
 
   return (
     <div className="min-h-dvh bg-bg">
@@ -59,6 +79,18 @@ function BayarPage() {
             </p>
             <p className="mt-1 text-center text-xs text-subtle">
               Harga {formatRupiah(order.baseAmount)} + kode {order.uniqueCode.toString().padStart(3, "0")}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mx-auto mt-3 flex border-gold/40 bg-transparent text-bg hover:bg-bg/10"
+              onClick={() => void copyNominal(order.totalAmount)}
+            >
+              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+              {copied ? "Tersalin" : "Salin nominal"}
+            </Button>
+            <p className="mt-4 rounded-lg border border-gold/50 bg-gold/15 px-3 py-2 text-center text-xs font-medium leading-relaxed text-bg">
+              Pastikan nominal sesuai dengan tagihan di sistem.
             </p>
             <ul className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-subtle">
               {order.qtyVvip > 0 ? (

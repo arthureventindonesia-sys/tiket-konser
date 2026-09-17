@@ -17,6 +17,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAgenRouteImport } from './routes/admin/agen'
 import { Route as AdminKonfirmasiRouteImport } from './routes/admin/konfirmasi'
 import { Route as AdminPenggunaRouteImport } from './routes/admin/pengguna'
+import { Route as AdminTiketboxRouteImport } from './routes/admin/tiketbox'
 import { Route as AdminTiketingRouteImport } from './routes/admin/tiketing'
 import { Route as BayarOrderIdRouteImport } from './routes/bayar.$orderId'
 import { Route as TiketOrderIdRouteImport } from './routes/tiket.$orderId'
@@ -62,6 +63,11 @@ const AdminPenggunaRoute = AdminPenggunaRouteImport.update({
   path: '/pengguna',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminTiketboxRoute = AdminTiketboxRouteImport.update({
+  id: '/tiketbox',
+  path: '/tiketbox',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminTiketingRoute = AdminTiketingRouteImport.update({
   id: '/tiketing',
   path: '/tiketing',
@@ -91,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/admin/agen': typeof AdminAgenRoute
   '/admin/konfirmasi': typeof AdminKonfirmasiRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
+  '/admin/tiketbox': typeof AdminTiketboxRoute
   '/admin/tiketing': typeof AdminTiketingRoute
   '/bayar/$orderId': typeof BayarOrderIdRoute
   '/tiket/$orderId': typeof TiketOrderIdRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByTo {
   '/admin/agen': typeof AdminAgenRoute
   '/admin/konfirmasi': typeof AdminKonfirmasiRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
+  '/admin/tiketbox': typeof AdminTiketboxRoute
   '/admin/tiketing': typeof AdminTiketingRoute
   '/bayar/$orderId': typeof BayarOrderIdRoute
   '/tiket/$orderId': typeof TiketOrderIdRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/admin/agen': typeof AdminAgenRoute
   '/admin/konfirmasi': typeof AdminKonfirmasiRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
+  '/admin/tiketbox': typeof AdminTiketboxRoute
   '/admin/tiketing': typeof AdminTiketingRoute
   '/bayar/$orderId': typeof BayarOrderIdRoute
   '/tiket/$orderId': typeof TiketOrderIdRoute
@@ -135,6 +144,7 @@ export interface FileRouteTypes {
     | '/admin/agen'
     | '/admin/konfirmasi'
     | '/admin/pengguna'
+    | '/admin/tiketbox'
     | '/admin/tiketing'
     | '/bayar/$orderId'
     | '/tiket/$orderId'
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/admin/agen'
     | '/admin/konfirmasi'
     | '/admin/pengguna'
+    | '/admin/tiketbox'
     | '/admin/tiketing'
     | '/bayar/$orderId'
     | '/tiket/$orderId'
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/admin/agen'
     | '/admin/konfirmasi'
     | '/admin/pengguna'
+    | '/admin/tiketbox'
     | '/admin/tiketing'
     | '/bayar/$orderId'
     | '/tiket/$orderId'
@@ -237,6 +249,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPenggunaRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/tiketbox': {
+      id: '/admin/tiketbox'
+      path: '/tiketbox'
+      fullPath: '/admin/tiketbox'
+      preLoaderRoute: typeof AdminTiketboxRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/tiketing': {
       id: '/admin/tiketing'
       path: '/tiketing'
@@ -272,6 +291,7 @@ interface AdminRouteChildren {
   AdminAgenRoute: typeof AdminAgenRoute
   AdminKonfirmasiRoute: typeof AdminKonfirmasiRoute
   AdminPenggunaRoute: typeof AdminPenggunaRoute
+  AdminTiketboxRoute: typeof AdminTiketboxRoute
   AdminTiketingRoute: typeof AdminTiketingRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -280,6 +300,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAgenRoute: AdminAgenRoute,
   AdminKonfirmasiRoute: AdminKonfirmasiRoute,
   AdminPenggunaRoute: AdminPenggunaRoute,
+  AdminTiketboxRoute: AdminTiketboxRoute,
   AdminTiketingRoute: AdminTiketingRoute,
   AdminIndexRoute: AdminIndexRoute,
 }

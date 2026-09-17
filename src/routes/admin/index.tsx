@@ -120,9 +120,10 @@ function DashboardPage() {
         <Stat label="VVIP terjual" value={String(data.tickets.vvip)} />
         <Stat label="VIP terjual" value={String(data.tickets.vip)} />
         <Stat label="Festival terjual" value={String(data.tickets.festival)} />
-        <Stat label="Uang masuk" value={formatRupiah(data.revenue)} accent />
+        <Stat label="Uang masuk" value={formatRupiah(data.ticketRevenue)} accent />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Stat label="Kode unik terkonfirmasi" value={formatRupiah(data.uniqueCodeTotal)} />
         <Stat label="Menunggu konfirmasi" value={String(data.awaitingConfirm)} />
         <Stat label="Pesanan terkonfirmasi" value={String(data.confirmedOrders)} />
       </div>

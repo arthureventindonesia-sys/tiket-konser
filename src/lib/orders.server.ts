@@ -11,8 +11,8 @@ import {
 import { toWaNumber, uniqueCodeFromWhatsapp } from "@/lib/format";
 import { remainingOf } from "@/lib/stages";
 import { getLiveStage } from "@/lib/stages.server";
-import { ensureAdminSeeded, findAgentByCode } from "@/lib/staff.server";
-import type { AdminOrder, DashboardData, PublicOrder } from "@/lib/types";
+import { ensureAdminSeeded, ensureTiketboxSchema, findAgentByCode } from "@/lib/staff.server";
+import type { AdminOrder, DashboardData, PublicOrder, TicketboxRecord } from "@/lib/types";
 
 export type { AdminOrder, PublicOrder };
 
@@ -37,6 +37,8 @@ type OrderRow = {
   confirmed_at: string | null;
   created_at: string;
   stage_id: string | null;
+  taken_at?: string | null;
+  taken_by?: string | null;
 };
 
 function qtyOf(row: Pick<OrderRow, "qty_vvip" | "qty_vip" | "qty_festival">, type: TicketTypeId) {
@@ -389,6 +391,8 @@ export async function getDashboard(): Promise<DashboardData> {
     vip: number;
     festival: number;
     revenue: number;
+    unique_code_total: number;
+    ticket_revenue: number;
     confirmed_orders: number;
   }>`
     select
@@ -396,6 +400,8 @@ export async function getDashboard(): Promise<DashboardData> {
       coalesce(sum(qty_vip), 0)::int as vip,
       coalesce(sum(qty_festival), 0)::int as festival,
       coalesce(sum(total_amount), 0)::int as revenue,
+      coalesce(sum(unique_code), 0)::int as unique_code_total,
+      coalesce(sum(base_amount), 0)::int as ticket_revenue,
       coalesce(count(*), 0)::int as confirmed_orders
     from orders
     where status = 'confirmed'
@@ -414,6 +420,8 @@ export async function getDashboard(): Promise<DashboardData> {
       festival: Number(row.festival),
     },
     revenue: Number(row.revenue),
+    uniqueCodeTotal: Number(row.unique_code_total),
+    ticketRevenue: Number(row.ticket_revenue),
     confirmedOrders: Number(row.confirmed_orders),
     awaitingConfirm: Number(pendingConfirm[0]?.n ?? 0),
     awaitingPayment: Number(pendingPay[0]?.n ?? 0),
@@ -433,4 +441,60 @@ export function confirmationMessage(order: PublicOrder): string {
     "Satu kode berlaku untuk satu orang. Tunjukkan kode ini saat masuk.",
     "Sampai jumpa di panggung emas.",
   ].join("\n");
+}
+
+async function toTicketbox(row: OrderRow, queriedCode: string): Promise<TicketboxRecord> {
+  const pub = await toPublic(row, true, false);
+  return {
+    orderId: row.id,
+    publicId: pub.publicId,
+    fullName: pub.fullName,
+    email: pub.email,
+    whatsapp: pub.whatsapp,
+    address: pub.address,
+    qtyVvip: pub.qtyVvip,
+    qtyVip: pub.qtyVip,
+    qtyFestival: pub.qtyFestival,
+    tickets: pub.tickets,
+    confirmedAt: pub.confirmedAt,
+    takenAt: row.taken_at ?? null,
+    takenBy: row.taken_by ?? null,
+    queriedCode,
+  };
+}
+
+export async function lookupByTicketCode(code: string): Promise<TicketboxRecord> {
+  await ensureTiketboxSchema();
+  const needle = code.trim().toUpperCase();
+  if (needle.length < 4) throw new Error("Masukkan kode tiket");
+  const sql = await getSql();
+  const hit = await sql<{ order_id: number; code: string }>`
+    select order_id, code from tickets
+    where upper(code) = ${needle}
+    limit 1
+  `;
+  const found = hit[0];
+  if (!found) throw new Error("Kode tiket tidak ditemukan");
+  const rows = await sql<OrderRow>`select * from orders where id = ${found.order_id} limit 1`;
+  const row = rows[0];
+  if (!row || row.status !== "confirmed") throw new Error("Kode tiket tidak ditemukan");
+  return toTicketbox(row, found.code);
+}
+
+export async function takeoutOrder(orderId: number, username: string): Promise<TicketboxRecord> {
+  await ensureTiketboxSchema();
+  const sql = await getSql();
+  const rows = await sql<OrderRow>`select * from orders where id = ${orderId} limit 1`;
+  const row = rows[0];
+  if (!row || row.status !== "confirmed") throw new Error("Tiket tidak ditemukan");
+  if (row.taken_at) return toTicketbox(row, "");
+  const updated = await sql<OrderRow>`
+    update orders
+    set taken_at = now(),
+        taken_by = ${username}
+    where id = ${orderId} and taken_at is null
+    returning *
+  `;
+  const next = updated[0] ?? row;
+  return toTicketbox(next, "");
 }

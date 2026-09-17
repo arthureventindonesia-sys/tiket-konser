@@ -1,21 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Calendar, Clock, MapPin } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Calendar, Clock, MapPin } from "lucide-react";
+import { BuyButton } from "@/components/buy-button";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
+import { StageCountdown } from "@/components/stage-countdown";
 import { EVENT, GUESTS, PARTNERS } from "@/lib/event";
 
 export const Route = createFileRoute("/")({ component: Home });
-
-function BuyButton({ className }: { className?: string }) {
-  return (
-    <Link
-      to="/beli"
-      className={className ?? "inline-flex h-12 items-center gap-2 rounded-md bg-gold px-7 text-sm font-semibold text-gold-fg"}
-    >
-      Beli
-      <ArrowRight className="size-4" />
-    </Link>
-  );
-}
 
 function Home() {
   return (
@@ -52,6 +42,7 @@ function Home() {
               {EVENT.venue}, {EVENT.city}
             </span>
           </div>
+          <StageCountdown />
           <div className="mt-10">
             <BuyButton />
           </div>

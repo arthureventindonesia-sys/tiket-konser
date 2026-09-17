@@ -60,7 +60,25 @@ function mapStaff(row: StaffRow): StaffUser {
   };
 }
 
+let roleSchemaReady = false;
+export async function ensureTiketboxSchema(): Promise<void> {
+  if (roleSchemaReady) return;
+  const sql = await getSql();
+  await sql.query("alter table orders add column if not exists taken_at timestamptz");
+  await sql.query("alter table orders add column if not exists taken_by text");
+  try {
+    await sql.query("alter table staff_users drop constraint if exists staff_users_role_check");
+    await sql.query(
+      "alter table staff_users add constraint staff_users_role_check check (role in ('admin', 'crew', 'agent', 'tiketbox'))",
+    );
+  } catch {
+    // constraint already matches
+  }
+  roleSchemaReady = true;
+}
+
 export async function ensureAdminSeeded(): Promise<void> {
+  await ensureTiketboxSchema();
   const sql = await getSql();
   const existing = await sql<{ id: string }>`
     select id from staff_users where username = 'iang' limit 1
@@ -146,6 +164,7 @@ export async function createStaffAccount(input: {
   name: string;
   role: StaffRole;
 }): Promise<StaffUser> {
+  await ensureTiketboxSchema();
   const sql = await getSql();
   const username = input.username.trim().toLowerCase();
   if (!/^[a-z0-9._-]{3,24}$/.test(username)) {
@@ -191,4 +210,28 @@ export async function findAgentByCode(code: string): Promise<StaffUser | null> {
     limit 1
   `;
   return rows[0] ? mapStaff(rows[0]) : null;
+}
+
+export async function deleteStaffAccount(id: string, actorId: string): Promise<void> {
+  const staffId = String(id || "").trim();
+  if (!staffId) throw new Error("Akun tidak ditemukan");
+  if (staffId === actorId) throw new Error("Tidak bisa menghapus akun sendiri");
+  const sql = await getSql();
+  const rows = await sql<StaffRow>`
+    select id, username, name, role, referral_code
+    from staff_users where id = ${staffId} limit 1
+  `;
+  const target = rows[0];
+  if (!target) throw new Error("Akun tidak ditemukan");
+  if (target.username === "iang") throw new Error("Akun utama tidak dapat dihapus");
+  if (target.role === "admin") {
+    const admins = await sql<{ n: number }>`
+      select count(*)::int as n from staff_users where role = 'admin'
+    `;
+    if (Number(admins[0]?.n ?? 0) <= 1) {
+      throw new Error("Tidak bisa menghapus admin terakhir");
+    }
+  }
+  await sql.query("delete from staff_sessions where staff_id = $1", [staffId]);
+  await sql.query("delete from staff_users where id = $1", [staffId]);
 }
