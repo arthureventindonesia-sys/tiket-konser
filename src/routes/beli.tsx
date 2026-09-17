@@ -31,7 +31,8 @@ function BeliPage() {
   const [fullName, setFullName] = useState("");
   const [address, setAddress] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
-  const [referralCode, setReferralCode] = useState(ref ?? "");
+  const lockedRef = Boolean(ref?.trim());
+  const [referralCode, setReferralCode] = useState((ref ?? "").toUpperCase());
   const [qty, setQty] = useState({ vvip: 0, vip: 0, festival: 0 });
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -85,7 +86,7 @@ function BeliPage() {
           fullName,
           address,
           whatsapp,
-          referralCode: referralCode.trim() || undefined,
+          referralCode: (lockedRef ? ref : referralCode).trim() || undefined,
           qtyVvip: qty.vvip,
           qtyVip: qty.vip,
           qtyFestival: qty.festival,
@@ -157,13 +158,21 @@ function BeliPage() {
                 placeholder="08xxxxxxxxxx"
               />
             </Field>
-            <Field label="Kode referal (opsional)" htmlFor="referral">
+            <Field label={lockedRef ? "Kode referal agen" : "Kode referal (opsional)"} htmlFor="referral">
               <Input
                 id="referral"
                 value={referralCode}
-                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                readOnly={lockedRef}
+                onChange={(e) => {
+                  if (lockedRef) return;
+                  setReferralCode(e.target.value.toUpperCase());
+                }}
                 placeholder="Kode agen"
+                className={lockedRef ? "cursor-not-allowed bg-elevated/60 text-gold" : undefined}
               />
+              {lockedRef ? (
+                <p className="mt-1 text-xs text-gold">Kode referal terkunci dari tautan agen.</p>
+              ) : null}
             </Field>
           </div>
 
