@@ -9,6 +9,7 @@ const closed: SaleOffer = {
   remaining: { vvip: 0, vip: 0, festival: 0 },
   price: { vvip: 0, vip: 0, festival: 0 },
   allowed: [],
+  maxPerType: 4,
 };
 
 let cached: SaleOffer | null = null;

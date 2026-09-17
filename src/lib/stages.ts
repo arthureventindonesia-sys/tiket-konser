@@ -1,4 +1,5 @@
 import type { TicketTypeId } from "@/lib/event";
+import { MAX_PER_TYPE } from "@/lib/event";
 
 export const TICKET_STAGES = [
   { id: "early_bird", label: "Early Bird", allowed: ["vip", "festival"] as const },
@@ -34,7 +35,12 @@ export type SaleOffer = {
   remaining: StageQuota;
   price: StageQuota;
   allowed: TicketTypeId[];
+  maxPerType: number;
 };
+
+export function maxPerTypeForStage(id: string | null | undefined): number {
+  return id === "early_bird" ? 1 : MAX_PER_TYPE;
+}
 
 export function stageDef(id: string) {
   return TICKET_STAGES.find((s) => s.id === id);

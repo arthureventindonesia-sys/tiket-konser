@@ -4,6 +4,7 @@ import {
   remainingOf,
   stageDef,
   stageStatus,
+  maxPerTypeForStage,
   type SaleOffer,
   type StageId,
   type StageQuota,
@@ -134,6 +135,7 @@ export async function getSaleOffer(): Promise<SaleOffer> {
       remaining: emptyQuota(),
       price: emptyQuota(),
       allowed: [],
+      maxPerType: maxPerTypeForStage(next?.id),
     };
   }
   const remaining = emptyQuota();
@@ -147,6 +149,7 @@ export async function getSaleOffer(): Promise<SaleOffer> {
     remaining,
     price: stage.price,
     allowed: stage.allowed,
+    maxPerType: maxPerTypeForStage(stage.id),
   };
 }
 

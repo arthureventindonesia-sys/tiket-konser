@@ -49,11 +49,13 @@ function BeliPage() {
           remaining: { vvip: 0, vip: 0, festival: 0 },
           price: { vvip: 0, vip: 0, festival: 0 },
           allowed: [],
+          maxPerType: MAX_PER_TYPE,
         }),
       );
   }, []);
 
   const uniqueCode = uniqueCodeFromWhatsapp(whatsapp || "000");
+  const maxPerType = offer?.maxPerType ?? MAX_PER_TYPE;
   const priceOf = (id: (typeof TICKET_TYPES)[number]["id"]) =>
     offer?.price[id] || TICKET_TYPES.find((t) => t.id === id)?.price || 0;
   const baseAmount = useMemo(
@@ -64,7 +66,7 @@ function BeliPage() {
   const total = totalQty > 0 ? baseAmount + uniqueCode : 0;
 
   function setCount(id: keyof typeof qty, next: number) {
-    const cap = Math.min(MAX_PER_TYPE, offer?.remaining[id] ?? MAX_PER_TYPE);
+    const cap = Math.min(maxPerType, offer?.remaining[id] ?? maxPerType);
     setQty((prev) => ({ ...prev, [id]: Math.min(cap, Math.max(0, next)) }));
   }
 
@@ -86,7 +88,7 @@ function BeliPage() {
           fullName,
           address,
           whatsapp,
-          referralCode: (lockedRef ? ref : referralCode).trim() || undefined,
+          referralCode: (lockedRef ? (ref ?? "") : referralCode).trim() || undefined,
           qtyVvip: qty.vvip,
           qtyVip: qty.vip,
           qtyFestival: qty.festival,
@@ -223,8 +225,9 @@ function BeliPage() {
               );
             })}
             <p className="text-xs text-subtle">
-              Maksimal {MAX_PER_TYPE} tiket per jenis. Email dan WhatsApp hanya bisa dipakai satu kali
-              pembelian.
+              Maksimal {maxPerType} tiket per jenis
+              {offer?.stage?.id === "early_bird" ? " pada Early Bird" : ""}. Email dan WhatsApp hanya
+              bisa dipakai satu kali pembelian.
             </p>
           </div>
 

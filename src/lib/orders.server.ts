@@ -2,14 +2,13 @@ import { randomBytes } from "node:crypto";
 import { getSql } from "@/lib/db";
 import {
   EVENT,
-  MAX_PER_TYPE,
   MAX_PROOF_BYTES,
   TICKET_LABEL,
   type OrderStatus,
   type TicketTypeId,
 } from "@/lib/event";
 import { toWaNumber, uniqueCodeFromWhatsapp } from "@/lib/format";
-import { remainingOf } from "@/lib/stages";
+import { remainingOf, maxPerTypeForStage } from "@/lib/stages";
 import { getLiveStage } from "@/lib/stages.server";
 import { ensureAdminSeeded, ensureTiketboxSchema, findAgentByCode } from "@/lib/staff.server";
 import type { AdminOrder, DashboardData, PublicOrder, TicketboxRecord } from "@/lib/types";
@@ -166,8 +165,9 @@ export async function createOrder(input: {
           : `Sisa kuota ${TICKET_LABEL[type]} tahap ${stage.label}: ${sisa}`,
       );
     }
-    if (qty[type] > MAX_PER_TYPE) {
-      throw new Error(`Maksimal ${MAX_PER_TYPE} tiket ${TICKET_LABEL[type]} per pembelian`);
+    const maxPer = maxPerTypeForStage(stage.id);
+    if (qty[type] > maxPer) {
+      throw new Error(`Maksimal ${maxPer} tiket ${TICKET_LABEL[type]} pada tahap ${stage.label}`);
     }
   }
 
