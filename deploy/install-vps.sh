@@ -27,6 +27,7 @@ fi
 id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin "$APP_USER"
 
 mkdir -p /var/www
+git config --global --add safe.directory "$APP_DIR"
 if [[ -d "$APP_DIR/.git" ]]; then
   git -C "$APP_DIR" fetch origin
   git -C "$APP_DIR" reset --hard origin/main

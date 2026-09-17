@@ -54,6 +54,15 @@ Lalu isi kuota, harga, dan jadwal di menu **Tiketing**.
 
 ## Update kode nanti
 
+Kalau muncul `fatal: detected dubious ownership`, jalankan dulu:
+
+```bash
+git config --global --add safe.directory /var/www/goldensatyafair
+sudo bash /var/www/goldensatyafair/deploy/update.sh
+```
+
+Atau langsung:
+
 ```bash
 sudo bash /var/www/goldensatyafair/deploy/update.sh
 ```

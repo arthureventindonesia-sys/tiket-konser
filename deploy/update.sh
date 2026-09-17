@@ -10,11 +10,22 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
+git config --global --add safe.directory "$APP_DIR"
+
 cd "$APP_DIR"
+# simpan .env agar tidak hilang
+if [[ -f .env ]]; then
+  cp -a .env /tmp/gsf.env.bak
+fi
 git fetch origin
 git reset --hard origin/main
+if [[ -f /tmp/gsf.env.bak ]]; then
+  cp -a /tmp/gsf.env.bak .env
+  rm -f /tmp/gsf.env.bak
+fi
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
-# jaga .env agar tidak tertimpa (tidak ada di git)
+chmod 600 "$APP_DIR/.env" 2>/dev/null || true
+
 sudo -u "$APP_USER" npm ci
 set -a
 # shellcheck disable=SC1091
