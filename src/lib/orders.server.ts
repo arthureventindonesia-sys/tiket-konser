@@ -335,6 +335,53 @@ export async function listAgentOrders(referralCode: string): Promise<PublicOrder
   return out;
 }
 
+export async function listConfirmedExport(): Promise<
+  {
+    fullName: string;
+    email: string;
+    whatsapp: string;
+    address: string;
+    qtyVvip: number;
+    qtyVip: number;
+    qtyFestival: number;
+    ticketCodes: string;
+    baseAmount: number;
+    uniqueCode: number;
+    totalAmount: number;
+    referralCode: string;
+    confirmedAt: string;
+    createdAt: string;
+  }[]
+> {
+  const sql = await getSql();
+  const rows = await sql<OrderRow>`
+    select * from orders
+    where status = 'confirmed'
+    order by confirmed_at desc, id desc
+  `;
+  const out = [];
+  for (const row of rows) {
+    const pub = await toPublic(row, true, false);
+    out.push({
+      fullName: pub.fullName,
+      email: pub.email,
+      whatsapp: pub.whatsapp,
+      address: pub.address,
+      qtyVvip: pub.qtyVvip,
+      qtyVip: pub.qtyVip,
+      qtyFestival: pub.qtyFestival,
+      ticketCodes: pub.tickets.map((t) => t.code).join("; "),
+      baseAmount: pub.baseAmount,
+      uniqueCode: pub.uniqueCode,
+      totalAmount: pub.totalAmount,
+      referralCode: pub.referralCode ?? "",
+      confirmedAt: pub.confirmedAt ?? "",
+      createdAt: pub.createdAt,
+    });
+  }
+  return out;
+}
+
 export async function getDashboard(): Promise<DashboardData> {
   const sql = await getSql();
   const sold = await sql<{
