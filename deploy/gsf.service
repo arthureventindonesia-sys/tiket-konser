@@ -1,0 +1,18 @@
+[Unit]
+Description=Golden Satya Fair ticketing
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=gsf
+Group=gsf
+WorkingDirectory=/var/www/goldensatyafair
+EnvironmentFile=/var/www/goldensatyafair/.env
+ExecStart=/usr/bin/node .output/server/index.mjs
+Restart=always
+RestartSec=4
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
