@@ -152,6 +152,20 @@ export async function requireStaff(roles?: StaffRole[]): Promise<StaffUser> {
   return staff;
 }
 
+export async function requireAdminPassword(password: string): Promise<StaffUser> {
+  const staff = await requireStaff(["admin"]);
+  if (!password.trim()) throw new Error("Password admin wajib diisi");
+  const sql = await getSql();
+  const rows = await sql<{ password_hash: string }>`
+    select password_hash from staff_users where id = ${staff.id} limit 1
+  `;
+  const hash = rows[0]?.password_hash;
+  if (!hash || !(await verifyPassword(password, hash))) {
+    throw new Error("Password admin salah");
+  }
+  return staff;
+}
+
 function makeReferralCode(username: string): string {
   const base = username.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 8);
   const suffix = randomBytes(2).toString("hex").toUpperCase();

@@ -498,3 +498,27 @@ export async function takeoutOrder(orderId: number, username: string): Promise<T
   const next = updated[0] ?? row;
   return toTicketbox(next, "");
 }
+
+export async function resetAllSales(): Promise<{ orders: number; tickets: number }> {
+  const sql = await getSql();
+  const ticketCount = await sql<{ n: number }>`select coalesce(count(*), 0)::int as n from tickets`;
+  const orderCount = await sql<{ n: number }>`select coalesce(count(*), 0)::int as n from orders`;
+  await sql.query("delete from tickets");
+  await sql.query("delete from orders");
+  try {
+    await sql.query("alter sequence if exists tickets_id_seq restart with 1");
+    await sql.query("alter sequence if exists orders_id_seq restart with 1");
+  } catch {
+    // PGLite may not support IF EXISTS on sequence
+    try {
+      await sql.query("alter sequence tickets_id_seq restart with 1");
+      await sql.query("alter sequence orders_id_seq restart with 1");
+    } catch {
+      /* ignore */
+    }
+  }
+  return {
+    tickets: Number(ticketCount[0]?.n ?? 0),
+    orders: Number(orderCount[0]?.n ?? 0),
+  };
+}

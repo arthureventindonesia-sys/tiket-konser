@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
-import { fetchConfirmedExport, fetchDashboard } from "@/lib/fn/admin";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { fetchConfirmedExport, fetchDashboard, resetSales } from "@/lib/fn/admin";
+import { getStaffSession } from "@/lib/fn/staff";
 import { formatRupiah } from "@/lib/format";
 import type { DashboardData } from "@/lib/types";
 
@@ -22,11 +25,15 @@ function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     fetchDashboard()
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : "Gagal memuat"));
+    getStaffSession()
+      .then((s) => setIsAdmin(s?.role === "admin"))
+      .catch(() => setIsAdmin(false));
   }, []);
 
   async function downloadConfirmed() {
@@ -145,6 +152,77 @@ function DashboardPage() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+      {isAdmin ? <ResetPanel onDone={(next) => setData(next)} /> : null}
+    </div>
+  );
+}
+
+function ResetPanel({ onDone }: { onDone: (data: DashboardData) => void }) {
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function onReset(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const result = await resetSales({ data: { password } });
+      setPassword("");
+      setOpen(false);
+      toast.success(`Data dihapus: ${result.orders} pesanan, ${result.tickets} tiket`);
+      const next = await fetchDashboard();
+      onDone(next);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mereset");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-danger/40 bg-surface p-5">
+      <p className="text-xs uppercase tracking-[0.2em] text-danger">Zona berbahaya</p>
+      <h2 className="mt-1 font-display text-2xl">Reset data penjualan</h2>
+      <p className="mt-2 text-sm text-muted">
+        Menghapus semua data pembeli, pesanan, bukti transfer, dan kode tiket (terkonfirmasi maupun belum).
+        Akun panitia dan pengaturan tahap tiket tidak dihapus.
+      </p>
+      {!open ? (
+        <Button type="button" variant="danger" className="mt-4" onClick={() => setOpen(true)}>
+          Reset data
+        </Button>
+      ) : (
+        <form onSubmit={onReset} className="mt-4 max-w-sm space-y-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="admin-pass">Password admin</Label>
+            <Input
+              id="admin-pass"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="Masukkan password akun admin"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" variant="danger" disabled={busy || !password}>
+              {busy ? "Menghapus…" : "Hapus semua data"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                setOpen(false);
+                setPassword("");
+              }}
+            >
+              Batal
+            </Button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

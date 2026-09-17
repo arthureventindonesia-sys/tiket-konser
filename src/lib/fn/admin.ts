@@ -52,3 +52,12 @@ export const fetchAgentSales = createServerFn({ method: "GET" }).handler(async (
   }
   return all;
 });
+
+export const resetSales = createServerFn({ method: "POST" })
+  .validator((input: { password: string }) => ({ password: String(input?.password ?? "") }))
+  .handler(async ({ data }) => {
+    const { requireAdminPassword } = await import("@/lib/staff.server");
+    const { resetAllSales } = await import("@/lib/orders.server");
+    await requireAdminPassword(data.password);
+    return resetAllSales();
+  });

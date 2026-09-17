@@ -1,11 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Copy } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { copyText } from "@/lib/agent-qr";
 import { TICKET_LABEL } from "@/lib/event";
-import { formatRupiah } from "@/lib/format";
+import { formatRupiah, waMeUrl } from "@/lib/format";
 import { fetchOrder } from "@/lib/fn/orders";
 import type { PublicOrder } from "@/lib/types";
+
+const ADMIN_WA = "081548335445";
 
 export const Route = createFileRoute("/tiket/$orderId")({
   component: TiketPage,
@@ -15,6 +21,7 @@ function TiketPage() {
   const { orderId } = Route.useParams();
   const [order, setOrder] = useState<PublicOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +42,18 @@ function TiketPage() {
       window.clearInterval(t);
     };
   }, [orderId]);
+
+  async function onCopyLink() {
+    const url = window.location.href;
+    try {
+      await copyText(url);
+      setCopied(true);
+      toast.success("Tautan disalin");
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Gagal menyalin tautan");
+    }
+  }
 
   const confirmed = order?.status === "confirmed";
 
@@ -98,10 +117,26 @@ function TiketPage() {
               </div>
             )}
 
+            <div className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm leading-relaxed text-fg">
+              Konfirmasi tiket 1×24 jam. Jika melebihi waktu yang ditentukan silakan hubungi admin di{" "}
+              <a
+                href={waMeUrl(ADMIN_WA, `Halo admin Golden Satya Fair, saya ingin menanyakan status pesanan ${order.publicId}`)}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-gold underline decoration-gold underline-offset-4"
+              >
+                {ADMIN_WA}
+              </a>
+            </div>
+
+            <Button type="button" size="lg" className="w-full text-base font-bold tracking-wide" onClick={() => void onCopyLink()}>
+              <Copy className="size-5" />
+              {copied ? "TAUTAN TERSALIN" : "SALIN TAUTAN"}
+            </Button>
+
             <div className="text-sm text-subtle">
               <p>Total: {formatRupiah(order.totalAmount)}</p>
               <p className="mt-1 break-all">ID pesanan: {order.publicId}</p>
-              <p className="mt-3">Simpan tautan halaman ini untuk mengecek status.</p>
             </div>
           </div>
         ) : null}

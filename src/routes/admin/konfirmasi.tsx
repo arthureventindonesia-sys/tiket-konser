@@ -214,10 +214,21 @@ function KonfirmasiPage() {
       {preview ? (
         <button
           type="button"
-          className="fixed inset-0 z-50 grid place-items-center bg-bg/80 p-6"
+          className="fixed inset-0 z-50 flex h-[100dvh] w-[100dvw] items-center justify-center bg-bg/90 p-3 sm:p-6"
           onClick={() => setPreview(null)}
+          aria-label="Tutup pratinjau bukti transfer"
         >
-          <img src={preview} alt="Bukti transfer" className="max-h-full max-w-full rounded-lg" />
+          <img
+            src={preview}
+            alt="Bukti transfer"
+            className="max-h-full max-w-full object-contain"
+            style={{
+              width: "auto",
+              height: "auto",
+              maxWidth: "calc(100dvw - 1.5rem)",
+              maxHeight: "calc(100dvh - 1.5rem)",
+            }}
+          />
         </button>
       ) : null}
     </div>
