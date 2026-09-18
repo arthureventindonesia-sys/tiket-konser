@@ -8,7 +8,7 @@ import {
   type TicketTypeId,
 } from "@/lib/event";
 import { toWaNumber, uniqueCodeFromWhatsapp } from "@/lib/format";
-import { remainingOf, maxPerTypeForStage } from "@/lib/stages";
+import { remainingOf, maxPerTypeForStage, isSingleTicketStage } from "@/lib/stages";
 import { getLiveStage } from "@/lib/stages.server";
 import { ensureAdminSeeded, ensureTiketboxSchema, findAgentByCode } from "@/lib/staff.server";
 import type { AdminOrder, DashboardData, PublicOrder, TicketboxRecord } from "@/lib/types";
@@ -152,6 +152,12 @@ export async function createOrder(input: {
   const stage = await getLiveStage();
   if (!stage) throw new Error("Penjualan tiket sedang ditutup");
 
+  if (isSingleTicketStage(stage.id)) {
+    const kinds = (["vvip", "vip", "festival"] as const).filter((type) => qty[type] > 0);
+    if (kinds.length > 1 || totalQty > 1) {
+      throw new Error("Early Bird hanya boleh membeli 1 tiket, 1 jenis");
+    }
+  }
   for (const type of ["vvip", "vip", "festival"] as const) {
     if (qty[type] < 1) continue;
     if (!stage.allowed.includes(type)) {

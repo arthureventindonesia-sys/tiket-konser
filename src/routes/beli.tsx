@@ -11,7 +11,7 @@ import { EVENT, MAX_PER_TYPE, TICKET_TYPES } from "@/lib/event";
 import { formatDateTime, formatRupiah, uniqueCodeFromWhatsapp } from "@/lib/format";
 import { placeOrder } from "@/lib/fn/orders";
 import { fetchSaleOffer } from "@/lib/fn/stages";
-import type { SaleOffer } from "@/lib/stages";
+import { isSingleTicketStage, type SaleOffer } from "@/lib/stages";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/beli")({
@@ -56,6 +56,7 @@ function BeliPage() {
 
   const uniqueCode = uniqueCodeFromWhatsapp(whatsapp || "000");
   const maxPerType = offer?.maxPerType ?? MAX_PER_TYPE;
+  const earlyBird = isSingleTicketStage(offer?.stage?.id);
   const priceOf = (id: (typeof TICKET_TYPES)[number]["id"]) =>
     offer?.price[id] || TICKET_TYPES.find((t) => t.id === id)?.price || 0;
   const baseAmount = useMemo(
@@ -67,7 +68,12 @@ function BeliPage() {
 
   function setCount(id: keyof typeof qty, next: number) {
     const cap = Math.min(maxPerType, offer?.remaining[id] ?? maxPerType);
-    setQty((prev) => ({ ...prev, [id]: Math.min(cap, Math.max(0, next)) }));
+    const n = Math.min(cap, Math.max(0, next));
+    if (earlyBird) {
+      setQty({ vvip: 0, vip: 0, festival: 0, [id]: n });
+      return;
+    }
+    setQty((prev) => ({ ...prev, [id]: n }));
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -222,9 +228,10 @@ function BeliPage() {
               );
             })}
             <p className="text-xs text-subtle">
-              Maksimal {maxPerType} tiket per jenis
-              {offer?.stage?.id === "early_bird" ? " pada Early Bird" : ""}. Email dan WhatsApp hanya
-              bisa dipakai satu kali pembelian.
+              {earlyBird
+                ? "Early Bird: hanya 1 jenis tiket, maksimal 1 tiket."
+                : `Maksimal ${maxPerType} tiket per jenis.`}{" "}
+              Email dan WhatsApp hanya bisa dipakai satu kali pembelian.
             </p>
           </div>
 

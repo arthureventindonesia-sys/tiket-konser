@@ -42,6 +42,10 @@ export function maxPerTypeForStage(id: string | null | undefined): number {
   return id === "early_bird" ? 1 : MAX_PER_TYPE;
 }
 
+export function isSingleTicketStage(id: string | null | undefined): boolean {
+  return id === "early_bird";
+}
+
 export function stageDef(id: string) {
   return TICKET_STAGES.find((s) => s.id === id);
 }
