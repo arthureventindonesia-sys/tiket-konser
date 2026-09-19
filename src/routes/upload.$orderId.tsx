@@ -26,7 +26,7 @@ function UploadPage() {
     fetchOrder({ data: orderId })
       .then((o) => {
         if (cancelled) return;
-        if (o.status === "confirmed") {
+        if (o.status === "confirmed" || o.status === "cancelled") {
           void navigate({ to: "/tiket/$orderId", params: { orderId } });
           return;
         }

@@ -70,7 +70,7 @@ async function soldByStage(stageId: StageId): Promise<StageQuota> {
       coalesce(sum(qty_vip), 0)::int as vip,
       coalesce(sum(qty_festival), 0)::int as festival
     from orders
-    where stage_id = ${stageId}
+    where stage_id = ${stageId} and status <> ${"cancelled"}
   `;
   const row = rows[0];
   return {

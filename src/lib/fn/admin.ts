@@ -35,6 +35,15 @@ export const confirmPayment = createServerFn({ method: "POST" })
     return { ...order, waText: confirmationMessage(order) };
   });
 
+export const cancelPayment = createServerFn({ method: "POST" })
+  .validator((input: { orderId: number }) => ({ orderId: Number(input?.orderId) }))
+  .handler(async ({ data }) => {
+    const { requireStaff } = await import("@/lib/staff.server");
+    const { cancelOrder } = await import("@/lib/orders.server");
+    const staff = await requireStaff(["admin", "crew"]);
+    return cancelOrder(data.orderId, staff.id);
+  });
+
 export const fetchAgentSales = createServerFn({ method: "GET" }).handler(async () => {
   const { requireStaff } = await import("@/lib/staff.server");
   const { listAgentOrders } = await import("@/lib/orders.server");

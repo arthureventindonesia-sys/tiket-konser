@@ -1,6 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
+import { VisitBeacon } from "@/components/visit-beacon";
 import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
 
@@ -38,6 +39,7 @@ export const Route = createRootRoute({
       </head>
       <body className="bg-bg text-fg">
         <PreviewHostBridge />
+        <VisitBeacon />
         <AuthProvider>
           <Outlet />
           <Toaster

@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, ChevronLeft, ChevronRight, MessageCircle } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, MessageCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TICKET_LABEL } from "@/lib/event";
+import { copyText } from "@/lib/agent-qr";
+import { TICKET_LABEL, TICKET_TYPES, type TicketTypeId } from "@/lib/event";
 import { formatDateTime, formatRupiah, waMeUrl } from "@/lib/format";
-import { confirmPayment, fetchConfirmations } from "@/lib/fn/admin";
+import { cancelPayment, confirmPayment, fetchConfirmations } from "@/lib/fn/admin";
 import type { AdminOrder } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -15,14 +16,23 @@ export const Route = createFileRoute("/admin/konfirmasi")({
 });
 
 const PAGE_SIZE = 20;
-type ConfirmFilter = "pending" | "confirmed";
+type ConfirmFilter = "pending" | "confirmed" | "cancelled";
+type TypeFilter = "all" | TicketTypeId;
+
+function hasType(o: AdminOrder, type: TicketTypeId) {
+  if (type === "vvip") return o.qtyVvip > 0;
+  if (type === "vip") return o.qtyVip > 0;
+  return o.qtyFestival > 0;
+}
 
 function KonfirmasiPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [pendingCancel, setPendingCancel] = useState<number | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [filter, setFilter] = useState<ConfirmFilter>("pending");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -31,15 +41,32 @@ function KonfirmasiPage() {
       .catch((e) => setError(e instanceof Error ? e.message : "Gagal memuat"));
   }, []);
 
-  const pendingCount = orders.filter((o) => o.status !== "confirmed").length;
+  const pendingCount = orders.filter((o) => o.status !== "confirmed" && o.status !== "cancelled").length;
   const confirmedCount = orders.filter((o) => o.status === "confirmed").length;
+  const cancelledCount = orders.filter((o) => o.status === "cancelled").length;
+
+  const byStatus = useMemo(
+    () =>
+      orders.filter((o) => {
+        if (filter === "confirmed") return o.status === "confirmed";
+        if (filter === "cancelled") return o.status === "cancelled";
+        return o.status !== "confirmed" && o.status !== "cancelled";
+      }),
+    [orders, filter],
+  );
+
+  const typeCounts = useMemo(
+    () => ({
+      vvip: byStatus.filter((o) => hasType(o, "vvip")).length,
+      vip: byStatus.filter((o) => hasType(o, "vip")).length,
+      festival: byStatus.filter((o) => hasType(o, "festival")).length,
+    }),
+    [byStatus],
+  );
 
   const filtered = useMemo(
-    () =>
-      orders.filter((o) =>
-        filter === "confirmed" ? o.status === "confirmed" : o.status !== "confirmed",
-      ),
-    [orders, filter],
+    () => (typeFilter === "all" ? byStatus : byStatus.filter((o) => hasType(o, typeFilter))),
+    [byStatus, typeFilter],
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -61,6 +88,33 @@ function KonfirmasiPage() {
     }
   }
 
+  async function onCancel(id: number) {
+    if (pendingCancel !== id) {
+      setPendingCancel(id);
+      return;
+    }
+    setBusyId(id);
+    try {
+      const next = await cancelPayment({ data: { orderId: id } });
+      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...next, tickets: [] } : o)));
+      setPendingCancel(null);
+      toast.success("Tiket dibatalkan, kuota dikembalikan");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal membatalkan");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function copyLink(path: string, label: string) {
+    try {
+      await copyText(`${window.location.origin}${path}`);
+      toast.success(`${label} disalin`);
+    } catch {
+      toast.error("Gagal menyalin tautan");
+    }
+  }
+
   function ticketSummary(o: AdminOrder) {
     const parts = [];
     if (o.qtyVvip) parts.push(`${o.qtyVvip} ${TICKET_LABEL.vvip}`);
@@ -71,6 +125,11 @@ function KonfirmasiPage() {
 
   function changeFilter(next: ConfirmFilter) {
     setFilter(next);
+    setPage(1);
+  }
+
+  function changeType(next: TypeFilter) {
+    setTypeFilter(next);
     setPage(1);
   }
 
@@ -106,17 +165,61 @@ function KonfirmasiPage() {
           Terkonfirmasi
           <span className="ml-2 font-mono text-xs tabular-nums">{confirmedCount}</span>
         </button>
+        <button
+          type="button"
+          onClick={() => changeFilter("cancelled")}
+          className={cn(
+            "inline-flex h-10 items-center rounded-md px-4 text-sm",
+            filter === "cancelled" ? "bg-gold text-gold-fg" : "border border-border text-muted hover:bg-elevated hover:text-fg",
+          )}
+        >
+          Dibatalkan
+          <span className="ml-2 font-mono text-xs tabular-nums">{cancelledCount}</span>
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => changeType("all")}
+          className={cn(
+            "inline-flex h-10 items-center rounded-md px-4 text-sm",
+            typeFilter === "all" ? "bg-gold text-gold-fg" : "border border-border text-muted hover:bg-elevated hover:text-fg",
+          )}
+        >
+          Semua jenis
+          <span className="ml-2 font-mono text-xs tabular-nums">{byStatus.length}</span>
+        </button>
+        {TICKET_TYPES.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => changeType(t.id)}
+            className={cn(
+              "inline-flex h-10 items-center rounded-md px-4 text-sm",
+              typeFilter === t.id ? "bg-gold text-gold-fg" : "border border-border text-muted hover:bg-elevated hover:text-fg",
+            )}
+          >
+            {t.label}
+            <span className="ml-2 font-mono text-xs tabular-nums">{typeCounts[t.id]}</span>
+          </button>
+        ))}
       </div>
 
       {filtered.length === 0 ? (
         <p className="text-muted">
-          {filter === "confirmed" ? "Belum ada pembayaran terkonfirmasi." : "Tidak ada pesanan yang menunggu konfirmasi."}
+          {filter === "cancelled"
+            ? "Belum ada tiket yang dibatalkan."
+            : filter === "confirmed"
+              ? "Belum ada pembayaran terkonfirmasi."
+              : "Tidak ada pesanan yang menunggu konfirmasi."}
         </p>
       ) : (
         <>
           <ul className="space-y-4">
             {pageRows.map((o) => {
               const confirmed = o.status === "confirmed";
+              const cancelled = o.status === "cancelled";
               return (
                 <li key={o.id} className="rounded-xl border border-border bg-surface p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -129,8 +232,8 @@ function KonfirmasiPage() {
                       </p>
                       <p className="mt-1 text-xs text-subtle">{formatDateTime(o.createdAt)}</p>
                     </div>
-                    <Badge tone={confirmed ? "success" : o.hasProof ? "gold" : "muted"}>
-                      {confirmed ? "Terkonfirmasi" : o.hasProof ? "Menunggu" : "Belum unggah"}
+                    <Badge tone={cancelled ? "danger" : confirmed ? "success" : o.hasProof ? "gold" : "muted"}>
+                      {cancelled ? "Dibatalkan" : confirmed ? "Terkonfirmasi" : o.hasProof ? "Menunggu" : "Belum unggah"}
                     </Badge>
                   </div>
                   {o.proofData ? (
@@ -153,10 +256,30 @@ function KonfirmasiPage() {
                       {o.tickets.map((t) => t.code).join(" · ")}
                     </p>
                   ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void copyLink(`/upload/${o.publicId}`, "Tautan unggah bukti")}
+                    >
+                      <Copy className="size-3.5" />
+                      Salin tautan unggah
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void copyLink(`/tiket/${o.publicId}`, "Tautan status pesanan")}
+                    >
+                      <Copy className="size-3.5" />
+                      Salin tautan status
+                    </Button>
+                  </div>
                   <div className="mt-4 flex flex-wrap items-center gap-2">
                     <Button
                       variant={confirmed ? "success" : "default"}
-                      disabled={confirmed || !o.hasProof || busyId === o.id}
+                      disabled={confirmed || cancelled || !o.hasProof || busyId === o.id}
                       onClick={() => onConfirm(o.id)}
                     >
                       <Check className="size-4" />
@@ -172,6 +295,20 @@ function KonfirmasiPage() {
                       >
                         <MessageCircle className="size-5" />
                       </a>
+                    ) : null}
+                    {!cancelled ? (
+                      <Button
+                        type="button"
+                        variant={pendingCancel === o.id ? "danger" : "outline"}
+                        disabled={busyId === o.id}
+                        onClick={() => void onCancel(o.id)}
+                      >
+                        {pendingCancel === o.id
+                          ? busyId === o.id
+                            ? "Membatalkan…"
+                            : "Yakin batal?"
+                          : "Batalkan tiket"}
+                      </Button>
                     ) : null}
                   </div>
                 </li>

@@ -75,7 +75,7 @@ export const TICKET_LABEL: Record<TicketTypeId, string> = {
   festival: "FESTIVAL",
 };
 
-export type OrderStatus = "awaiting_payment" | "awaiting_confirm" | "confirmed";
+export type OrderStatus = "awaiting_payment" | "awaiting_confirm" | "confirmed" | "cancelled";
 export type StaffRole = "admin" | "crew" | "agent" | "tiketbox";
 
 export function staffHome(role: StaffRole): "/admin" | "/admin/agen" | "/admin/tiketbox" {

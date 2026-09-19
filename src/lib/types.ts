@@ -57,3 +57,21 @@ export type TicketboxRecord = {
   takenBy: string | null;
   queriedCode: string;
 };
+
+export type ActiveStaffSession = {
+  id: string;
+  username: string;
+  name: string;
+  role: import("@/lib/event").StaffRole;
+  lastSeenAt: string;
+};
+
+export type TrafficDay = { day: string; views: number; visitors: number };
+
+export type TrafficData = {
+  viewsToday: number;
+  visitorsToday: number;
+  viewsTotal: number;
+  visitorsTotal: number;
+  days: TrafficDay[];
+};

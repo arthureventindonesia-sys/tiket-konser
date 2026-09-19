@@ -38,6 +38,8 @@ type OrderRow = {
   stage_id: string | null;
   taken_at?: string | null;
   taken_by?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
 };
 
 function qtyOf(row: Pick<OrderRow, "qty_vvip" | "qty_vip" | "qty_festival">, type: TicketTypeId) {
@@ -96,6 +98,28 @@ async function ensureIdentitySchema(): Promise<void> {
   if (identitySchemaReady) return;
   const sql = await getSql();
   await sql.query("alter table orders add column if not exists whatsapp_norm text");
+  await sql.query("alter table orders add column if not exists cancelled_at timestamptz");
+  await sql.query("alter table orders add column if not exists cancelled_by text");
+  try {
+    await sql.query("alter table orders drop constraint if exists orders_status_check");
+    await sql.query(
+      "alter table orders add constraint orders_status_check check (status in ('awaiting_payment', 'awaiting_confirm', 'confirmed', 'cancelled'))",
+    );
+  } catch {
+    /* already applied */
+  }
+  try {
+    await sql.query("drop index if exists orders_email_lower_uidx");
+    await sql.query("drop index if exists orders_whatsapp_norm_uidx");
+    await sql.query(
+      "create unique index if not exists orders_email_lower_uidx on orders (lower(email)) where status <> 'cancelled'",
+    );
+    await sql.query(
+      "create unique index if not exists orders_whatsapp_norm_uidx on orders (whatsapp_norm) where status <> 'cancelled' and whatsapp_norm is not null",
+    );
+  } catch {
+    /* unique already partial */
+  }
   identitySchemaReady = true;
 }
 
@@ -103,13 +127,13 @@ async function assertFreshIdentity(email: string, waNorm: string): Promise<void>
   await ensureIdentitySchema();
   const sql = await getSql();
   const byEmail = await sql<{ id: number }>`
-    select id from orders where lower(email) = ${email} limit 1
+    select id from orders where lower(email) = ${email} and status <> ${"cancelled"} limit 1
   `;
   if (byEmail[0]) {
     throw new Error("Email ini sudah digunakan untuk pembelian tiket");
   }
   const byWa = await sql<{ id: number }>`
-    select id from orders where whatsapp_norm = ${waNorm} limit 1
+    select id from orders where whatsapp_norm = ${waNorm} and status <> ${"cancelled"} limit 1
   `;
   if (byWa[0]) {
     throw new Error("Nomor WhatsApp ini sudah digunakan untuk pembelian tiket");
@@ -250,6 +274,7 @@ export async function saveProof(input: {
   const rows = await sql<OrderRow>`select * from orders where public_id = ${input.publicId} limit 1`;
   const row = rows[0];
   if (!row) throw new Error("Pesanan tidak ditemukan");
+  if (row.status === "cancelled") throw new Error("Pesanan sudah dibatalkan");
   if (row.status === "confirmed") throw new Error("Pesanan sudah dikonfirmasi");
 
   const updated = await sql<OrderRow>`
@@ -274,6 +299,7 @@ export async function confirmOrder(orderId: number, staffId: string): Promise<Ad
   const rows = await sql<OrderRow>`select * from orders where id = ${orderId} limit 1`;
   const row = rows[0];
   if (!row) throw new Error("Pesanan tidak ditemukan");
+  if (row.status === "cancelled") throw new Error("Pesanan sudah dibatalkan");
   if (!row.proof_data) throw new Error("Belum ada bukti transfer");
   if (row.status === "confirmed") {
     const pub = await toPublic(row, true);
@@ -311,7 +337,32 @@ export async function confirmOrder(orderId: number, staffId: string): Promise<Ad
   return toAdmin(pub, next);
 }
 
+export async function cancelOrder(orderId: number, staffId: string): Promise<AdminOrder> {
+  await ensureIdentitySchema();
+  const sql = await getSql();
+  const rows = await sql<OrderRow>`select * from orders where id = ${orderId} limit 1`;
+  const row = rows[0];
+  if (!row) throw new Error("Pesanan tidak ditemukan");
+  if (row.status === "cancelled") {
+    const pub = await toPublic(row, true, false);
+    return toAdmin(pub, row);
+  }
+  await sql.query("delete from tickets where order_id = $1", [orderId]);
+  const updated = await sql<OrderRow>`
+    update orders
+    set status = ${"cancelled"},
+        cancelled_at = now(),
+        cancelled_by = ${staffId}
+    where id = ${orderId}
+    returning *
+  `;
+  const next = updated[0]!;
+  const pub = await toPublic(next, true, false);
+  return toAdmin(pub, next);
+}
+
 export async function listAdminOrders(): Promise<AdminOrder[]> {
+  await ensureIdentitySchema();
   const sql = await getSql();
   const rows = await sql<OrderRow>`
     select * from orders
@@ -319,7 +370,8 @@ export async function listAdminOrders(): Promise<AdminOrder[]> {
       case status
         when 'awaiting_confirm' then 0
         when 'awaiting_payment' then 1
-        else 2
+        when 'confirmed' then 2
+        else 3
       end,
       created_at desc
   `;

@@ -3,13 +3,15 @@ import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { fetchConfirmedExport, fetchDashboard, resetSales } from "@/lib/fn/admin";
 import { getStaffSession } from "@/lib/fn/staff";
-import { formatRupiah } from "@/lib/format";
-import type { DashboardData } from "@/lib/types";
+import { fetchAdminMonitor } from "@/lib/fn/visits";
+import { formatDateTime, formatRupiah } from "@/lib/format";
+import type { ActiveStaffSession, DashboardData, TrafficData } from "@/lib/types";
 
 export const Route = createFileRoute("/admin/")({
   component: DashboardPage,
@@ -26,13 +28,23 @@ function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [online, setOnline] = useState<ActiveStaffSession[]>([]);
+  const [traffic, setTraffic] = useState<TrafficData | null>(null);
 
   useEffect(() => {
     fetchDashboard()
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : "Gagal memuat"));
     getStaffSession()
-      .then((s) => setIsAdmin(s?.role === "admin"))
+      .then((s) => {
+        const admin = s?.role === "admin";
+        setIsAdmin(admin);
+        if (!admin) return;
+        return fetchAdminMonitor().then((m) => {
+          setOnline(m.online);
+          setTraffic(m.traffic);
+        });
+      })
       .catch(() => setIsAdmin(false));
   }, []);
 
@@ -152,6 +164,65 @@ function DashboardPage() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+      {isAdmin ? (
+        <>
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-gold">Staff online</p>
+            <h2 className="mt-1 font-display text-2xl">Akun yang sedang login</h2>
+            {online.length === 0 ? (
+              <p className="mt-3 text-sm text-muted">Tidak ada staff aktif dalam 30 menit terakhir.</p>
+            ) : (
+              <ul className="mt-4 divide-y divide-border">
+                {online.map((s) => (
+                  <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                    <div>
+                      <p className="font-medium">{s.name}</p>
+                      <p className="text-sm text-subtle">{s.username}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge tone={s.role === "admin" ? "gold" : "muted"}>{s.role}</Badge>
+                      <span className="text-xs text-subtle">{formatDateTime(s.lastSeenAt)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          {traffic ? (
+            <section className="space-y-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-gold">Trafik pengunjung</p>
+                <h2 className="mt-1 font-display text-2xl">Kunjungan website</h2>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <Stat label="Pengunjung hari ini" value={String(traffic.visitorsToday)} accent />
+                <Stat label="Kunjungan hari ini" value={String(traffic.viewsToday)} />
+                <Stat label="Pengunjung total" value={String(traffic.visitorsTotal)} />
+                <Stat label="Kunjungan total" value={String(traffic.viewsTotal)} />
+              </div>
+              <div className="h-64 rounded-xl border border-border bg-surface p-4">
+                <p className="mb-3 text-sm text-muted">7 hari terakhir</p>
+                <ResponsiveContainer width="100%" height="90%">
+                  <BarChart data={traffic.days}>
+                    <XAxis dataKey="day" stroke="var(--color-subtle)" fontSize={12} tickLine={false} axisLine={false} />
+                    <YAxis stroke="var(--color-subtle)" fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      cursor={{ fill: "color-mix(in oklab, var(--color-fg) 4%, transparent)" }}
+                      contentStyle={{
+                        background: "var(--color-elevated)",
+                        border: "1px solid var(--color-border)",
+                        color: "var(--color-fg)",
+                      }}
+                    />
+                    <Bar dataKey="visitors" name="Pengunjung" fill="var(--color-gold)" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="views" name="Kunjungan" fill="var(--color-muted)" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+          ) : null}
+        </>
+      ) : null}
       {isAdmin ? <ResetPanel onDone={(next) => setData(next)} /> : null}
     </div>
   );

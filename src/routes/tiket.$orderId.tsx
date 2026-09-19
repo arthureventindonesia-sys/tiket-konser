@@ -11,7 +11,10 @@ import { formatRupiah, waMeUrl } from "@/lib/format";
 import { fetchOrder } from "@/lib/fn/orders";
 import type { PublicOrder } from "@/lib/types";
 
-const ADMIN_WA = "081548335445";
+const ADMIN_CONTACTS = [
+  { name: "Asya", wa: "085226999456" },
+  { name: "Lita", wa: "085219887178" },
+] as const;
 
 export const Route = createFileRoute("/tiket/$orderId")({
   component: TiketPage,
@@ -56,6 +59,7 @@ function TiketPage() {
   }
 
   const confirmed = order?.status === "confirmed";
+  const cancelled = order?.status === "cancelled";
 
   return (
     <div className="min-h-dvh bg-bg">
@@ -71,12 +75,16 @@ function TiketPage() {
                 <p className="font-medium">{order.fullName}</p>
                 <p className="text-sm text-subtle">{order.email}</p>
               </div>
-              <Badge tone={confirmed ? "success" : order.hasProof ? "gold" : "muted"}>
-                {confirmed ? "Terkonfirmasi" : order.hasProof ? "Menunggu panitia" : "Belum bayar"}
+              <Badge tone={cancelled ? "danger" : confirmed ? "success" : order.hasProof ? "gold" : "muted"}>
+                {cancelled ? "Dibatalkan" : confirmed ? "Terkonfirmasi" : order.hasProof ? "Menunggu panitia" : "Belum bayar"}
               </Badge>
             </div>
 
-            {confirmed && order.tickets.length > 0 ? (
+            {cancelled ? (
+              <div className="rounded-xl border border-danger/40 bg-surface p-5 text-sm text-muted">
+                Pesanan ini dibatalkan. Kuota tiket sudah dikembalikan. Email dan WhatsApp bisa dipakai untuk pembelian baru.
+              </div>
+            ) : confirmed && order.tickets.length > 0 ? (
               <ul className="space-y-3">
                 {order.tickets.map((t) => (
                   <li
@@ -118,15 +126,23 @@ function TiketPage() {
             )}
 
             <div className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm leading-relaxed text-fg">
-              Konfirmasi tiket 1×24 jam. Jika melebihi waktu yang ditentukan silakan hubungi admin di{" "}
-              <a
-                href={waMeUrl(ADMIN_WA, `Halo admin Golden Satya Fair, saya ingin menanyakan status pesanan ${order.publicId}`)}
-                target="_blank"
-                rel="noreferrer"
-                className="font-semibold text-gold underline decoration-gold underline-offset-4"
-              >
-                {ADMIN_WA}
-              </a>
+              Konfirmasi tiket 1×24 jam. Jika melebihi waktu yang ditentukan silakan hubungi admin:
+              <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                {ADMIN_CONTACTS.map((c) => (
+                  <a
+                    key={c.wa}
+                    href={waMeUrl(
+                      c.wa,
+                      `Halo ${c.name}, saya ingin menanyakan status pesanan Golden Satya Fair ${order.publicId}`,
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-gold underline decoration-gold underline-offset-4"
+                  >
+                    {c.wa} ({c.name})
+                  </a>
+                ))}
+              </span>
             </div>
 
             <Button type="button" size="lg" className="w-full text-base font-bold tracking-wide" onClick={() => void onCopyLink()}>

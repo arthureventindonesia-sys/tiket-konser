@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-start/server";
 import { getSql } from "@/lib/db";
 import type { StaffRole } from "@/lib/event";
+import type { ActiveStaffSession } from "@/lib/types";
 
 const scrypt = promisify(scryptCb);
 const COOKIE = "gsf_staff";
@@ -94,6 +95,8 @@ export async function ensureAdminSeeded(): Promise<void> {
 
 export async function loginStaff(username: string, password: string): Promise<StaffUser> {
   await ensureAdminSeeded();
+  const { ensureVisitSchema } = await import("@/lib/visits.server");
+  await ensureVisitSchema();
   const sql = await getSql();
   const rows = await sql<StaffRow & { password_hash: string }>`
     select id, username, name, role, referral_code, password_hash
@@ -108,8 +111,8 @@ export async function loginStaff(username: string, password: string): Promise<St
   const token = randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
   await sql`
-    insert into staff_sessions (token, staff_id, expires_at)
-    values (${token}, ${row.id}, ${expires.toISOString()})
+    insert into staff_sessions (token, staff_id, expires_at, last_seen_at)
+    values (${token}, ${row.id}, ${expires.toISOString()}, now())
   `;
   setCookie(COOKIE, token, {
     httpOnly: true,
@@ -132,6 +135,8 @@ export async function logoutStaff(): Promise<void> {
 
 export async function getCurrentStaff(): Promise<StaffUser | null> {
   await ensureAdminSeeded();
+  const { ensureVisitSchema } = await import("@/lib/visits.server");
+  await ensureVisitSchema();
   const token = getCookie(COOKIE);
   if (!token) return null;
   const sql = await getSql();
@@ -142,7 +147,38 @@ export async function getCurrentStaff(): Promise<StaffUser | null> {
     where s.token = ${token} and s.expires_at > now()
     limit 1
   `;
+  if (rows[0]) {
+    await sql`update staff_sessions set last_seen_at = now() where token = ${token}`;
+  }
   return rows[0] ? mapStaff(rows[0]) : null;
+}
+
+export async function listActiveStaff(): Promise<ActiveStaffSession[]> {
+  const { ensureVisitSchema } = await import("@/lib/visits.server");
+  await ensureVisitSchema();
+  const sql = await getSql();
+  const rows = await sql<{
+    id: string;
+    username: string;
+    name: string;
+    role: StaffRole;
+    last_seen_at: string;
+  }>`
+    select u.id, u.username, u.name, u.role, max(s.last_seen_at) as last_seen_at
+    from staff_sessions s
+    join staff_users u on u.id = s.staff_id
+    where s.expires_at > now()
+      and s.last_seen_at > now() - interval '30 minutes'
+    group by u.id, u.username, u.name, u.role
+    order by max(s.last_seen_at) desc
+  `;
+  return rows.map((r) => ({
+    id: r.id,
+    username: r.username,
+    name: r.name,
+    role: r.role,
+    lastSeenAt: r.last_seen_at,
+  }));
 }
 
 export async function requireStaff(roles?: StaffRole[]): Promise<StaffUser> {
