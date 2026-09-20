@@ -3,6 +3,7 @@ import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/site-header";
+import { ProofDeadlineBanner } from "@/components/proof-deadline";
 import { Button } from "@/components/ui/button";
 import { EVENT, TICKET_LABEL } from "@/lib/event";
 import { formatRupiah } from "@/lib/format";
@@ -25,7 +26,7 @@ function BayarPage() {
     fetchOrder({ data: orderId })
       .then((o) => {
         if (cancelled) return;
-        if (o.status === "confirmed" || o.status === "awaiting_confirm") {
+        if (o.status === "confirmed" || o.status === "awaiting_confirm" || o.status === "cancelled") {
           void navigate({ to: "/tiket/$orderId", params: { orderId } });
           return;
         }
@@ -92,6 +93,16 @@ function BayarPage() {
             <p className="mt-4 rounded-lg border border-gold/50 bg-gold/15 px-3 py-2 text-center text-xs font-medium leading-relaxed text-bg">
               Pastikan nominal sesuai dengan tagihan di sistem.
             </p>
+            <div className="mt-4">
+              <ProofDeadlineBanner
+                createdAt={order.createdAt}
+                compact
+                onLight
+                onExpired={() => {
+                  void navigate({ to: "/tiket/$orderId", params: { orderId } });
+                }}
+              />
+            </div>
             <ul className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-subtle">
               {order.qtyVvip > 0 ? (
                 <li>

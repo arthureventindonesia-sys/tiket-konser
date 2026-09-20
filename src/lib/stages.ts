@@ -3,7 +3,7 @@ import { MAX_PER_TYPE } from "@/lib/event";
 
 export const TICKET_STAGES = [
   { id: "early_bird", label: "Early Bird", allowed: ["vip", "festival"] as const },
-  { id: "presale_1", label: "Presale 1", allowed: ["vvip", "vip", "festival"] as const },
+  { id: "presale_1", label: "Presale 1", allowed: ["vip", "festival"] as const },
   { id: "presale_2", label: "Presale 2", allowed: ["vvip", "vip", "festival"] as const },
   { id: "ots", label: "OTS", allowed: ["vvip", "vip", "festival"] as const },
 ] as const;
@@ -64,5 +64,8 @@ export function stageStatus(input: {
 }
 
 export function remainingOf(quota: number, sold: number): number {
-  return Math.max(0, quota - sold);
+  const q = Math.max(0, Number(quota) || 0);
+  const s = Math.max(0, Number(sold) || 0);
+  if (q <= 0) return 1_000_000;
+  return Math.max(0, q - s);
 }

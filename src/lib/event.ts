@@ -13,6 +13,11 @@ export const EVENT = {
   qris: "/images/qris-statis.jpg",
 } as const;
 
+export const ADMIN_CONTACTS = [
+  { name: "Admin FESTIVAL", wa: "085749110099" },
+  { name: "Admin VIP", wa: "085226999456" },
+] as const;
+
 export const GUESTS = [
   { name: "Sal Priadi", logo: "/images/logo-sal.png", photo: "/images/guest-sal.jpg" },
   { name: "Bilal Indrajaya", logo: "/images/logo-bilal.png", photo: "/images/guest-bilal.jpg" },
@@ -61,7 +66,13 @@ export const TICKET_TYPES = [
 export type TicketTypeId = (typeof TICKET_TYPES)[number]["id"];
 
 export const MAX_PER_TYPE = 4;
+export const MAX_TOTAL_TICKETS = 4;
 export const MAX_PROOF_BYTES = 1_000_000;
+export const AUTO_CANCEL_MINUTES = 10;
+
+export function proofExpiresAt(createdAt: string | Date): number {
+  return new Date(createdAt).getTime() + AUTO_CANCEL_MINUTES * 60 * 1000;
+}
 
 export const TICKET_PRICE: Record<TicketTypeId, number> = {
   vvip: 1_500_000,

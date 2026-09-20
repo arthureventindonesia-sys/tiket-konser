@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Calendar, Clock, MapPin } from "lucide-react";
 import { BuyButton } from "@/components/buy-button";
+import { AdminContacts } from "@/components/admin-contacts";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { StageCountdown } from "@/components/stage-countdown";
 import { EVENT, GUESTS, PARTNERS } from "@/lib/event";
@@ -45,6 +46,9 @@ function Home() {
           <StageCountdown />
           <div className="mt-10">
             <BuyButton />
+          </div>
+          <div className="mt-6 max-w-md">
+            <AdminContacts />
           </div>
         </div>
       </section>

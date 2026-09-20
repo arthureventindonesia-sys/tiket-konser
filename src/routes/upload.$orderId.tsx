@@ -2,6 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/site-header";
+import { AdminContacts } from "@/components/admin-contacts";
+import { ProofDeadlineBanner } from "@/components/proof-deadline";
 import { Button } from "@/components/ui/button";
 import { MAX_PROOF_BYTES } from "@/lib/event";
 import { formatRupiah } from "@/lib/format";
@@ -91,6 +93,12 @@ function UploadPage() {
         {error ? <p className="mt-4 text-danger">{error}</p> : null}
         {order ? (
           <form onSubmit={onSubmit} className="mt-8 space-y-5">
+            <ProofDeadlineBanner
+              createdAt={order.createdAt}
+              onExpired={() => {
+                void navigate({ to: "/tiket/$orderId", params: { orderId } });
+              }}
+            />
             <div className="rounded-lg border border-border bg-surface p-4 text-sm">
               <p className="text-muted">{order.fullName}</p>
               <p className="mt-1 font-mono text-lg tabular-nums text-gold">
@@ -124,6 +132,7 @@ function UploadPage() {
             <Button type="submit" className="w-full" size="lg" disabled={busy || !preview}>
               {busy ? "Mengunggah…" : "Kirim bukti transfer"}
             </Button>
+            <AdminContacts />
           </form>
         ) : null}
       </main>

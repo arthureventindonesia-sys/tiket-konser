@@ -120,6 +120,8 @@ export async function getLiveStage(): Promise<TicketStage | null> {
 }
 
 export async function getSaleOffer(): Promise<SaleOffer> {
+  const { expireUnpaidOrders } = await import("@/lib/orders.server");
+  await expireUnpaidOrders();
   const stage = await getLiveStage();
   if (!stage) {
     const stages = await listStages();

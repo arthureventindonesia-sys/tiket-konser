@@ -3,18 +3,14 @@ import { Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
+import { AdminContacts } from "@/components/admin-contacts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { copyText } from "@/lib/agent-qr";
 import { TICKET_LABEL } from "@/lib/event";
-import { formatRupiah, waMeUrl } from "@/lib/format";
+import { formatRupiah } from "@/lib/format";
 import { fetchOrder } from "@/lib/fn/orders";
 import type { PublicOrder } from "@/lib/types";
-
-const ADMIN_CONTACTS = [
-  { name: "Asya", wa: "085226999456" },
-  { name: "Lita", wa: "085219887178" },
-] as const;
 
 export const Route = createFileRoute("/tiket/$orderId")({
   component: TiketPage,
@@ -125,25 +121,10 @@ function TiketPage() {
               </div>
             )}
 
-            <div className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm leading-relaxed text-fg">
-              Konfirmasi tiket 1×24 jam. Jika melebihi waktu yang ditentukan silakan hubungi admin:
-              <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                {ADMIN_CONTACTS.map((c) => (
-                  <a
-                    key={c.wa}
-                    href={waMeUrl(
-                      c.wa,
-                      `Halo ${c.name}, saya ingin menanyakan status pesanan Golden Satya Fair ${order.publicId}`,
-                    )}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-semibold text-gold underline decoration-gold underline-offset-4"
-                  >
-                    {c.wa} ({c.name})
-                  </a>
-                ))}
-              </span>
-            </div>
+            <AdminContacts
+              note="Konfirmasi tiket 1×24 jam. Jika melebihi waktu yang ditentukan silakan hubungi admin:"
+              message={`saya ingin menanyakan status pesanan Golden Satya Fair ${order.publicId}`}
+            />
 
             <Button type="button" size="lg" className="w-full text-base font-bold tracking-wide" onClick={() => void onCopyLink()}>
               <Copy className="size-5" />

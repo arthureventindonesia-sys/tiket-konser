@@ -3,6 +3,8 @@ import { getSql } from "@/lib/db";
 import {
   EVENT,
   MAX_PROOF_BYTES,
+  AUTO_CANCEL_MINUTES,
+  MAX_TOTAL_TICKETS,
   TICKET_LABEL,
   type OrderStatus,
   type TicketTypeId,
@@ -123,6 +125,22 @@ async function ensureIdentitySchema(): Promise<void> {
   identitySchemaReady = true;
 }
 
+export async function expireUnpaidOrders(): Promise<number> {
+  await ensureIdentitySchema();
+  const sql = await getSql();
+  const updated = await sql<{ id: number }>`
+    update orders
+    set status = ${"cancelled"},
+        cancelled_at = now(),
+        cancelled_by = ${"system"}
+    where status = ${"awaiting_payment"}
+      and (proof_data is null or proof_data = '')
+      and created_at < now() - (${AUTO_CANCEL_MINUTES}::int * interval '1 minute')
+    returning id
+  `;
+  return updated.length;
+}
+
 async function assertFreshIdentity(email: string, waNorm: string): Promise<void> {
   await ensureIdentitySchema();
   const sql = await getSql();
@@ -150,6 +168,7 @@ export async function createOrder(input: {
   qtyVip: number;
   qtyFestival: number;
 }): Promise<PublicOrder> {
+  await expireUnpaidOrders();
   await ensureAdminSeeded();
   const email = input.email.trim().toLowerCase();
   const fullName = input.fullName.trim();
@@ -181,6 +200,8 @@ export async function createOrder(input: {
     if (kinds.length > 1 || totalQty > 1) {
       throw new Error("Early Bird hanya boleh membeli 1 tiket, 1 jenis");
     }
+  } else if (totalQty > MAX_TOTAL_TICKETS) {
+    throw new Error(`Maksimal ${MAX_TOTAL_TICKETS} tiket per pembelian, bisa campur jenis`);
   }
   for (const type of ["vvip", "vip", "festival"] as const) {
     if (qty[type] < 1) continue;
@@ -247,6 +268,7 @@ export async function createOrder(input: {
 }
 
 export async function getPublicOrder(publicId: string): Promise<PublicOrder> {
+  await expireUnpaidOrders();
   const sql = await getSql();
   const rows = await sql<OrderRow>`select * from orders where public_id = ${publicId} limit 1`;
   const row = rows[0];
@@ -270,6 +292,7 @@ export async function saveProof(input: {
   const allowed = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
   if (!allowed.includes(input.mime)) throw new Error("Format gambar: JPG, PNG, atau WEBP");
 
+  await expireUnpaidOrders();
   const sql = await getSql();
   const rows = await sql<OrderRow>`select * from orders where public_id = ${input.publicId} limit 1`;
   const row = rows[0];
@@ -362,6 +385,7 @@ export async function cancelOrder(orderId: number, staffId: string): Promise<Adm
 }
 
 export async function listAdminOrders(): Promise<AdminOrder[]> {
+  await expireUnpaidOrders();
   await ensureIdentitySchema();
   const sql = await getSql();
   const rows = await sql<OrderRow>`

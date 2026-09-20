@@ -46,7 +46,7 @@ function TiketingPage() {
         <p className="text-xs uppercase tracking-[0.24em] text-gold">Tiketing</p>
         <h1 className="mt-1 font-display text-3xl">Tahap penjualan</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted">
-          Atur kuota, harga, waktu, dan status tiap tahap. Early Bird hanya VIP dan Festival. Pembeli
+          Atur kuota, harga, waktu, dan status tiap tahap. Early Bird dan Presale 1 hanya VIP dan Festival. Pembeli
           otomatis masuk ke tahap yang sedang berlangsung.
         </p>
       </div>
@@ -206,7 +206,7 @@ function StageCard({
                 }
               />
               <p className="mt-2 font-mono text-xs tabular-nums text-muted">
-                Terjual {sold} · Sisa {allowed ? sisa : 0}
+                Terjual {sold} · Sisa {allowed ? (quota[type] > 0 ? sisa : "tak terbatas") : 0}
               </p>
             </div>
           );

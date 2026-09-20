@@ -3,11 +3,12 @@ import { Minus, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
+import { AdminContacts } from "@/components/admin-contacts";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { EVENT, MAX_PER_TYPE, TICKET_TYPES } from "@/lib/event";
+import { EVENT, MAX_PER_TYPE, MAX_TOTAL_TICKETS, TICKET_TYPES } from "@/lib/event";
 import { formatDateTime, formatRupiah, uniqueCodeFromWhatsapp } from "@/lib/format";
 import { placeOrder } from "@/lib/fn/orders";
 import { fetchSaleOffer } from "@/lib/fn/stages";
@@ -68,12 +69,16 @@ function BeliPage() {
 
   function setCount(id: keyof typeof qty, next: number) {
     const cap = Math.min(maxPerType, offer?.remaining[id] ?? maxPerType);
-    const n = Math.min(cap, Math.max(0, next));
     if (earlyBird) {
+      const n = Math.min(cap, Math.max(0, next));
       setQty({ vvip: 0, vip: 0, festival: 0, [id]: n });
       return;
     }
-    setQty((prev) => ({ ...prev, [id]: n }));
+    setQty((prev) => {
+      const others = prev.vvip + prev.vip + prev.festival - prev[id];
+      const n = Math.min(cap, MAX_TOTAL_TICKETS - others, Math.max(0, next));
+      return { ...prev, [id]: n };
+    });
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -166,7 +171,7 @@ function BeliPage() {
                 placeholder="08xxxxxxxxxx"
               />
             </Field>
-            <Field label={lockedRef ? "Kode referal agen" : "Kode referal (opsional)"} htmlFor="referral">
+            <Field label={lockedRef ? "Kode referal agen" : "Kode referal (opsional) BOLEH DI KOSONGKAN"} htmlFor="referral">
               <Input
                 id="referral"
                 value={referralCode}
@@ -188,7 +193,7 @@ function BeliPage() {
             <p className="text-sm font-medium text-muted">Jenis tiket</p>
             {TICKET_TYPES.filter((t) => !offer || offer.allowed.includes(t.id)).map((t) => {
               const sisa = offer?.remaining[t.id] ?? MAX_PER_TYPE;
-              const habis = sisa < 1;
+              const habis = Boolean(offer?.open) && sisa < 1;
               return (
                 <div
                   key={t.id}
@@ -202,6 +207,7 @@ function BeliPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-display text-lg leading-tight">{t.label}</p>
                     <p className="font-mono text-xs text-gold">{formatRupiah(priceOf(t.id))}</p>
+                    {habis ? <p className="mt-0.5 text-xs text-danger">Kuota habis</p> : null}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -218,7 +224,11 @@ function BeliPage() {
                       type="button"
                       className="grid size-11 place-items-center rounded-md border border-border bg-elevated"
                       onClick={() => setCount(t.id, qty[t.id] + 1)}
-                      disabled={!offer?.open || habis}
+                      disabled={
+                        !offer?.open ||
+                        habis ||
+                        (!earlyBird && totalQty >= MAX_TOTAL_TICKETS)
+                      }
                       aria-label={`Tambah ${t.label}`}
                     >
                       <Plus className="size-4" />
@@ -227,19 +237,19 @@ function BeliPage() {
                 </div>
               );
             })}
-            <p className="text-xs text-subtle">
+            <div className="rounded-lg border-2 border-gold bg-gold/15 px-4 py-3 text-sm font-semibold leading-relaxed text-fg">
               {earlyBird
-                ? "Early Bird: hanya 1 jenis tiket, maksimal 1 tiket."
-                : `Maksimal ${maxPerType} tiket per jenis.`}{" "}
+                ? "Early Bird: hanya 1 jenis tiket, maksimal 1 tiket. "
+                : `Maksimal ${MAX_TOTAL_TICKETS} tiket per pembelian, boleh campur jenis. `}
               Email dan WhatsApp hanya bisa dipakai satu kali pembelian.
-            </p>
+            </div>
           </div>
 
-          <label className="flex items-start gap-3 rounded-lg border border-border bg-surface p-4 text-sm text-muted">
+          <label className="flex items-start gap-3 rounded-lg border border-black/20 bg-white p-4 text-sm text-black">
             <Checkbox
               checked={agreed}
               onCheckedChange={(v) => setAgreed(v === true)}
-              className="mt-0.5"
+              className="mt-0.5 border-black/40 bg-white data-[state=checked]:border-gold data-[state=checked]:bg-gold data-[state=checked]:text-gold-fg"
             />
             <ol className="list-decimal space-y-1 pl-4">
               <li>Pastikan Email dan WhatsApp sudah benar dan AKTIF</li>
@@ -252,6 +262,7 @@ function BeliPage() {
           <Button type="submit" size="lg" className="w-full" disabled={busy || !agreed || totalQty < 1 || !offer?.open}>
             {busy ? "Memproses…" : "Checkout"}
           </Button>
+          <AdminContacts />
         </form>
 
         <aside className="h-fit rounded-xl border border-border bg-surface p-5 md:sticky md:top-24">
