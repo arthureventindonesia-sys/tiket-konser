@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Download } from "lucide-react";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -8,6 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { fetchConfirmedExport, fetchDashboard, resetSales } from "@/lib/fn/admin";
+import {
+  downloadConfirmedCsv,
+  downloadConfirmedExcel,
+  downloadConfirmedPdf,
+} from "@/lib/confirmed-export";
 import { getStaffSession } from "@/lib/fn/staff";
 import { fetchAdminMonitor } from "@/lib/fn/visits";
 import { formatDateTime, formatRupiah } from "@/lib/format";
@@ -17,16 +22,10 @@ export const Route = createFileRoute("/admin/")({
   component: DashboardPage,
 });
 
-function csvCell(value: string | number): string {
-  const s = String(value ?? "");
-  if (/[;"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
 function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState(false);
+  const [downloading, setDownloading] = useState<"csv" | "xls" | "pdf" | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [online, setOnline] = useState<ActiveStaffSession[]>([]);
   const [traffic, setTraffic] = useState<TrafficData | null>(null);
@@ -48,64 +47,22 @@ function DashboardPage() {
       .catch(() => setIsAdmin(false));
   }, []);
 
-  async function downloadConfirmed() {
-    setDownloading(true);
+  async function downloadConfirmed(kind: "csv" | "xls" | "pdf") {
+    setDownloading(kind);
     try {
       const rows = await fetchConfirmedExport();
       if (rows.length === 0) {
         toast.error("Belum ada data terkonfirmasi");
         return;
       }
-      const header = [
-        "Nama",
-        "Email",
-        "WhatsApp",
-        "Alamat",
-        "VVIP",
-        "VIP",
-        "Festival",
-        "Kode tiket",
-        "Nominal tiket",
-        "Kode unik",
-        "Total bayar",
-        "Referal",
-        "Dikonfirmasi",
-      ];
-      const lines = [
-        header.join(";"),
-        ...rows.map((r) =>
-          [
-            r.fullName,
-            r.email,
-            r.whatsapp,
-            r.address,
-            r.qtyVvip,
-            r.qtyVip,
-            r.qtyFestival,
-            r.ticketCodes,
-            r.baseAmount,
-            r.uniqueCode.toString().padStart(3, "0"),
-            r.totalAmount,
-            r.referralCode,
-            r.confirmedAt ? new Date(r.confirmedAt).toLocaleString("id-ID") : "",
-          ]
-            .map(csvCell)
-            .join(";"),
-        ),
-      ];
-      const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const day = new Date().toISOString().slice(0, 10);
-      a.href = url;
-      a.download = `gsf-terkonfirmasi-${day}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success(`${rows.length} data diunduh`);
+      if (kind === "xls") downloadConfirmedExcel(rows);
+      else if (kind === "pdf") await downloadConfirmedPdf(rows);
+      else downloadConfirmedCsv(rows);
+      toast.success(`${rows.length} data diunduh (${kind === "xls" ? "Excel" : kind.toUpperCase()})`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengunduh");
     } finally {
-      setDownloading(false);
+      setDownloading(null);
     }
   }
 
@@ -125,15 +82,35 @@ function DashboardPage() {
           <p className="text-xs uppercase tracking-[0.24em] text-gold">Dashboard</p>
           <h1 className="mt-1 font-display text-3xl">Penjualan tiket</h1>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => void downloadConfirmed()}
-          disabled={downloading || data.confirmedOrders < 1}
-        >
-          <Download className="size-4" />
-          {downloading ? "Menyiapkan…" : "Unduh data terkonfirmasi"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void downloadConfirmed("xls")}
+            disabled={Boolean(downloading) || data.confirmedOrders < 1}
+          >
+            <FileSpreadsheet className="size-4" />
+            {downloading === "xls" ? "Menyiapkan…" : "Excel"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void downloadConfirmed("pdf")}
+            disabled={Boolean(downloading) || data.confirmedOrders < 1}
+          >
+            <FileText className="size-4" />
+            {downloading === "pdf" ? "Menyiapkan…" : "PDF"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void downloadConfirmed("csv")}
+            disabled={Boolean(downloading) || data.confirmedOrders < 1}
+          >
+            <Download className="size-4" />
+            {downloading === "csv" ? "Menyiapkan…" : "CSV"}
+          </Button>
+        </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="VVIP terjual" value={String(data.tickets.vvip)} />
