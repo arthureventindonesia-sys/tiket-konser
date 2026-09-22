@@ -42,7 +42,7 @@ function PartnerStrip({
   );
 }
 
-export function SiteHeader({ solid = false }: { solid?: boolean }) {
+export function SiteHeader({ solid = false, compact = false }: { solid?: boolean; compact?: boolean }) {
   return (
     <header
       className={cn(
@@ -50,21 +50,28 @@ export function SiteHeader({ solid = false }: { solid?: boolean }) {
         solid
           ? "border-b border-border bg-bg"
           : "bg-gradient-to-b from-bg/90 to-transparent",
+        compact && "px-4 py-2 md:px-6 md:py-2.5",
       )}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3 md:gap-5">
           <Link to="/" className="shrink-0" aria-label={EVENT.name}>
-            <BrandLogo />
+            <BrandLogo imgClassName={compact ? "h-8 max-w-[160px] md:h-10" : undefined} />
           </Link>
-          <span className="hidden h-7 w-px bg-gold/35 sm:block" aria-hidden />
-          <PartnerStrip className="hidden sm:flex" />
+          {!compact ? (
+            <>
+              <span className="hidden h-7 w-px bg-gold/35 sm:block" aria-hidden />
+              <PartnerStrip className="hidden sm:flex" />
+            </>
+          ) : null}
         </div>
         <nav className="flex shrink-0 items-center gap-2">
-          <BuyButton showArrow={false} className="h-11 px-5" />
+          <BuyButton showArrow={false} className={compact ? "h-9 px-4 text-xs" : "h-11 px-5"} />
         </nav>
       </div>
-      <PartnerStrip className="mt-2.5 justify-center sm:hidden" imgClassName="h-5 max-w-[64px]" />
+      {!compact ? (
+        <PartnerStrip className="mt-2.5 justify-center sm:hidden" imgClassName="h-5 max-w-[64px]" />
+      ) : null}
     </header>
   );
 }

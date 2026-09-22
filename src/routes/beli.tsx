@@ -116,8 +116,9 @@ function BeliPage() {
   return (
     <div className="min-h-dvh bg-bg">
       <SiteHeader solid />
-      <main className="mx-auto grid max-w-5xl gap-10 px-5 py-10 md:grid-cols-[1.1fr_0.9fr] md:px-8">
-        <form onSubmit={onSubmit} className="space-y-6">
+      <main className="mx-auto max-w-5xl px-5 py-10 md:px-8">
+        <form onSubmit={onSubmit} className="grid gap-10 md:grid-cols-[1.1fr_0.9fr]">
+        <div className="space-y-6">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-gold">
               {offer?.stage ? offer.stage.label : "Data pemesan"}
@@ -259,11 +260,8 @@ function BeliPage() {
             </ol>
           </label>
 
-          <Button type="submit" size="lg" className="w-full" disabled={busy || !agreed || totalQty < 1 || !offer?.open}>
-            {busy ? "Memproses…" : "Checkout"}
-          </Button>
           <AdminContacts />
-        </form>
+        </div>
 
         <aside className="h-fit rounded-xl border border-border bg-surface p-5 md:sticky md:top-24">
           <p className="text-xs uppercase tracking-[0.2em] text-gold">{EVENT.name}</p>
@@ -296,7 +294,11 @@ function BeliPage() {
           ) : (
             <p className="mt-6 text-sm text-subtle">Pilih tiket untuk melihat total.</p>
           )}
+          <Button type="submit" size="lg" className="mt-6 w-full" disabled={busy || !agreed || totalQty < 1 || !offer?.open}>
+            {busy ? "Memproses…" : "Checkout"}
+          </Button>
         </aside>
+        </form>
       </main>
       <SiteFooter />
     </div>

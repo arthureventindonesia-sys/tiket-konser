@@ -6,11 +6,13 @@ export function ProofDeadlineBanner({
   onExpired,
   compact = false,
   onLight = false,
+  dense = false,
 }: {
   createdAt: string;
   onExpired?: () => void;
   compact?: boolean;
   onLight?: boolean;
+  dense?: boolean;
 }) {
   const [left, setLeft] = useState(() => proofExpiresAt(createdAt) - Date.now());
   const fired = useRef(false);
@@ -35,25 +37,23 @@ export function ProofDeadlineBanner({
   const mm = String(Math.floor(total / 60)).padStart(2, "0");
   const ss = String(total % 60).padStart(2, "0");
 
+  const box = dense
+    ? "rounded-md border-2 border-danger bg-danger px-2 py-2 text-center text-fg"
+    : onLight
+      ? "rounded-lg border-2 border-danger bg-danger px-3 py-3 text-center text-fg"
+      : compact
+        ? "rounded-lg border-2 border-danger bg-danger/20 px-3 py-3 text-center"
+        : "rounded-xl border-2 border-danger bg-danger/15 px-4 py-4 text-center";
+
   return (
-    <div
-      className={
-        onLight
-          ? "rounded-lg border-2 border-danger bg-danger px-3 py-3 text-center text-fg"
-          : compact
-            ? "rounded-lg border-2 border-danger bg-danger/20 px-3 py-3 text-center"
-            : "rounded-xl border-2 border-danger bg-danger/15 px-4 py-4 text-center"
-      }
-    >
-      <p
-        className={`text-[11px] font-bold uppercase tracking-[0.18em] ${onLight ? "text-fg" : "text-danger"}`}
-      >
+    <div className={box}>
+      <p className={`font-bold uppercase tracking-[0.14em] ${dense ? "text-[10px]" : "text-[11px]"} ${onLight || dense ? "text-fg" : "text-danger"}`}>
         Batas waktu unggah
       </p>
-      <p className={`mt-1 font-mono font-bold tabular-nums ${onLight ? "text-fg" : "text-fg"} ${compact || onLight ? "text-2xl" : "text-3xl"}`}>
+      <p className={`mt-0.5 font-mono font-bold tabular-nums ${dense ? "text-xl" : compact || onLight ? "text-2xl" : "text-3xl"}`}>
         {expired ? "00:00" : `${mm}:${ss}`}
       </p>
-      <p className={`mt-2 font-semibold leading-snug ${onLight ? "text-fg" : "text-fg"} ${compact || onLight ? "text-sm" : "text-base"}`}>
+      <p className={`mt-1 font-semibold leading-snug ${dense ? "text-[11px]" : compact || onLight ? "text-sm" : "text-base"}`}>
         {expired
           ? "Tiket otomatis dibatalkan karena belum transaksi dan upload bukti transfer."
           : `Tiket otomatis dibatalkan dalam ${AUTO_CANCEL_MINUTES} menit jika belum melakukan transaksi dan upload bukti transfer.`}

@@ -57,86 +57,76 @@ function BayarPage() {
     window.setTimeout(() => setCopied(false), 2000);
   }
 
+  const tickets = [
+    order?.qtyVvip ? `${TICKET_LABEL.vvip} × ${order.qtyVvip}` : "",
+    order?.qtyVip ? `${TICKET_LABEL.vip} × ${order.qtyVip}` : "",
+    order?.qtyFestival ? `${TICKET_LABEL.festival} × ${order.qtyFestival}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <div className="min-h-dvh bg-bg">
-      <SiteHeader solid />
-      <main className="grid min-h-[calc(100dvh-72px)] place-items-center px-4 py-10">
-        {error ? <p className="text-danger">{error}</p> : null}
-        {!error && !order ? <p className="text-muted">Menyiapkan QRIS…</p> : null}
+    <div className="flex min-h-dvh flex-col bg-bg">
+      <SiteHeader solid compact />
+      <main className="flex flex-1 items-stretch justify-center sm:items-center sm:px-4 sm:py-4">
+        {error ? <p className="p-4 text-danger">{error}</p> : null}
+        {!error && !order ? <p className="p-4 text-muted">Menyiapkan QRIS…</p> : null}
         {order ? (
-          <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-border bg-fg p-5 text-gold-fg shadow-[var(--shadow-elevated)]">
-            <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-subtle">
-              <span>QRIS Statis</span>
-              <span>{EVENT.shortName}</span>
+          <div className="mx-auto flex w-full max-w-[420px] flex-1 flex-col bg-fg px-4 py-3 text-gold-fg sm:flex-none sm:rounded-2xl sm:border sm:border-border sm:p-4 sm:shadow-[var(--shadow-elevated)]">
+            <div className="grid min-h-0 flex-1 grid-rows-[minmax(120px,1fr)_auto] gap-3">
+              <div className="grid min-h-0 place-items-center overflow-hidden rounded-xl bg-white p-2">
+                <img
+                  src={`${EVENT.qris}?v=3`}
+                  alt="QRIS Golden Satya Fair"
+                  className="max-h-full max-w-full object-contain object-center"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <div className="text-center">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-bg">
+                    Nominal transfer (termasuk kode unik)
+                  </p>
+                  <p className="mt-1 font-mono text-[1.7rem] font-bold leading-none tabular-nums text-bg">
+                    {formatRupiah(order.totalAmount)}
+                  </p>
+                  <p className="mt-1 text-[13px] font-bold text-bg">
+                    Harga {formatRupiah(order.baseAmount)} + kode {order.uniqueCode.toString().padStart(3, "0")}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  className="h-11 w-full text-sm font-bold tracking-wide"
+                  onClick={() => void copyNominal(order.totalAmount)}
+                >
+                  {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                  {copied ? "NOMINAL TERSALIN" : "SALIN NOMINAL"}
+                </Button>
+                <p className="rounded-md border border-gold/50 bg-gold/15 px-2 py-1.5 text-center text-[11px] font-semibold text-bg">
+                  Pastikan nominal sesuai dengan tagihan di sistem.
+                </p>
+                <ProofDeadlineBanner
+                  createdAt={order.createdAt}
+                  dense
+                  onLight
+                  onExpired={() => {
+                    void navigate({ to: "/tiket/$orderId", params: { orderId } });
+                  }}
+                />
+                {tickets ? <p className="text-center text-[11px] font-medium text-subtle">{tickets}</p> : null}
+                <Button
+                  className="h-11 w-full text-sm font-bold"
+                  onClick={() => navigate({ to: "/upload/$orderId", params: { orderId } })}
+                >
+                  KONFIRMASI PEMBAYARAN
+                </Button>
+                <p className="text-center text-[10px] text-subtle">
+                  Scan, transfer sesuai nominal, lalu konfirmasi.{" "}
+                  <Link to="/" className="underline-offset-2 hover:underline">
+                    Beranda
+                  </Link>
+                </p>
+              </div>
             </div>
-            <h1 className="mt-3 text-center font-display text-2xl text-bg">{EVENT.merchantName}</h1>
-            <p className="text-center text-xs text-subtle">NMID {EVENT.nmid}</p>
-            <div className="mx-auto mt-4 overflow-hidden rounded-lg bg-bg">
-              <img src={EVENT.qris} alt="QRIS statis Golden Satya Fair" className="w-full" />
-            </div>
-            <p className="mt-4 text-center text-sm font-bold uppercase tracking-[0.14em] text-bg">
-              Nominal transfer (termasuk kode unik)
-            </p>
-            <p className="mt-1 text-center font-mono text-3xl font-bold tabular-nums text-bg">
-              {formatRupiah(order.totalAmount)}
-            </p>
-            <p className="mt-2 text-center text-base font-bold leading-snug text-bg">
-              Harga {formatRupiah(order.baseAmount)} + kode {order.uniqueCode.toString().padStart(3, "0")}
-            </p>
-            <Button
-              type="button"
-              size="lg"
-              className="mt-4 w-full text-base font-bold tracking-wide"
-              onClick={() => void copyNominal(order.totalAmount)}
-            >
-              {copied ? <Check className="size-5" /> : <Copy className="size-5" />}
-              {copied ? "NOMINAL TERSALIN" : "SALIN NOMINAL"}
-            </Button>
-            <p className="mt-4 rounded-lg border border-gold/50 bg-gold/15 px-3 py-2 text-center text-xs font-medium leading-relaxed text-bg">
-              Pastikan nominal sesuai dengan tagihan di sistem.
-            </p>
-            <div className="mt-4">
-              <ProofDeadlineBanner
-                createdAt={order.createdAt}
-                compact
-                onLight
-                onExpired={() => {
-                  void navigate({ to: "/tiket/$orderId", params: { orderId } });
-                }}
-              />
-            </div>
-            <ul className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-subtle">
-              {order.qtyVvip > 0 ? (
-                <li>
-                  {TICKET_LABEL.vvip} × {order.qtyVvip}
-                </li>
-              ) : null}
-              {order.qtyVip > 0 ? (
-                <li>
-                  {TICKET_LABEL.vip} × {order.qtyVip}
-                </li>
-              ) : null}
-              {order.qtyFestival > 0 ? (
-                <li>
-                  {TICKET_LABEL.festival} × {order.qtyFestival}
-                </li>
-              ) : null}
-            </ul>
-            <Button
-              className="mt-5 w-full"
-              size="lg"
-              onClick={() => navigate({ to: "/upload/$orderId", params: { orderId } })}
-            >
-              KONFIRMASI PEMBAYARAN
-            </Button>
-            <p className="mt-3 text-center text-[11px] text-subtle">
-              Scan dengan e-wallet, transfer sesuai nominal, lalu konfirmasi.
-            </p>
-            <p className="mt-2 text-center text-[11px]">
-              <Link to="/" className="text-subtle underline-offset-4 hover:underline">
-                Kembali ke beranda
-              </Link>
-            </p>
           </div>
         ) : null}
       </main>
