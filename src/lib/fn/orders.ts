@@ -16,7 +16,7 @@ export const placeOrder = createServerFn({ method: "POST" })
     return createOrder(data);
   });
 
-export const fetchOrder = createServerFn({ method: "GET" })
+export const fetchOrder = createServerFn({ method: "POST" })
   .validator((publicId: string) => publicId)
   .handler(async ({ data }) => {
     const { getPublicOrder } = await import("@/lib/orders.server");

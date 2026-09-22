@@ -26,6 +26,8 @@ function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<"csv" | "xls" | "pdf" | null>(null);
+  const [exportFrom, setExportFrom] = useState("");
+  const [exportTo, setExportTo] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [online, setOnline] = useState<ActiveStaffSession[]>([]);
   const [traffic, setTraffic] = useState<TrafficData | null>(null);
@@ -48,16 +50,26 @@ function DashboardPage() {
   }, []);
 
   async function downloadConfirmed(kind: "csv" | "xls" | "pdf") {
+    if (exportFrom && exportTo && exportFrom > exportTo) {
+      toast.error("Tanggal mulai tidak boleh setelah tanggal selesai");
+      return;
+    }
     setDownloading(kind);
     try {
-      const rows = await fetchConfirmedExport();
+      const rows = await fetchConfirmedExport({
+        data: { from: exportFrom, to: exportTo },
+      });
       if (rows.length === 0) {
-        toast.error("Belum ada data terkonfirmasi");
+        toast.error(
+          exportFrom || exportTo
+            ? "Tidak ada data terkonfirmasi pada jangka waktu itu"
+            : "Belum ada data terkonfirmasi",
+        );
         return;
       }
-      if (kind === "xls") downloadConfirmedExcel(rows);
-      else if (kind === "pdf") await downloadConfirmedPdf(rows);
-      else downloadConfirmedCsv(rows);
+      if (kind === "xls") downloadConfirmedExcel(rows, exportFrom, exportTo);
+      else if (kind === "pdf") await downloadConfirmedPdf(rows, exportFrom, exportTo);
+      else downloadConfirmedCsv(rows, exportFrom, exportTo);
       toast.success(`${rows.length} data diunduh (${kind === "xls" ? "Excel" : kind.toUpperCase()})`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengunduh");
@@ -82,34 +94,57 @@ function DashboardPage() {
           <p className="text-xs uppercase tracking-[0.24em] text-gold">Dashboard</p>
           <h1 className="mt-1 font-display text-3xl">Penjualan tiket</h1>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void downloadConfirmed("xls")}
-            disabled={Boolean(downloading) || data.confirmedOrders < 1}
-          >
-            <FileSpreadsheet className="size-4" />
-            {downloading === "xls" ? "Menyiapkan…" : "Excel"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void downloadConfirmed("pdf")}
-            disabled={Boolean(downloading) || data.confirmedOrders < 1}
-          >
-            <FileText className="size-4" />
-            {downloading === "pdf" ? "Menyiapkan…" : "PDF"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void downloadConfirmed("csv")}
-            disabled={Boolean(downloading) || data.confirmedOrders < 1}
-          >
-            <Download className="size-4" />
-            {downloading === "csv" ? "Menyiapkan…" : "CSV"}
-          </Button>
+        <div className="w-full max-w-xl space-y-3 sm:w-auto">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="export-from">Dari tanggal</Label>
+              <Input
+                id="export-from"
+                type="date"
+                value={exportFrom}
+                onChange={(e) => setExportFrom(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="export-to">Sampai tanggal</Label>
+              <Input
+                id="export-to"
+                type="date"
+                value={exportTo}
+                onChange={(e) => setExportTo(e.target.value)}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-subtle">Kosongkan tanggal untuk mengunduh semua data terkonfirmasi. Waktu mengikuti WIB.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void downloadConfirmed("xls")}
+              disabled={Boolean(downloading) || data.confirmedOrders < 1}
+            >
+              <FileSpreadsheet className="size-4" />
+              {downloading === "xls" ? "Menyiapkan…" : "Excel"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void downloadConfirmed("pdf")}
+              disabled={Boolean(downloading) || data.confirmedOrders < 1}
+            >
+              <FileText className="size-4" />
+              {downloading === "pdf" ? "Menyiapkan…" : "PDF"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void downloadConfirmed("csv")}
+              disabled={Boolean(downloading) || data.confirmedOrders < 1}
+            >
+              <Download className="size-4" />
+              {downloading === "csv" ? "Menyiapkan…" : "CSV"}
+            </Button>
+          </div>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

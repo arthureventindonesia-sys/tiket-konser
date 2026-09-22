@@ -37,6 +37,20 @@ function fileDay() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function fileStamp(from?: string, to?: string) {
+  if (from && to) return `${from}_${to}`;
+  if (from) return `dari-${from}`;
+  if (to) return `sampai-${to}`;
+  return fileDay();
+}
+
+function rangeLabel(from?: string, to?: string) {
+  if (from && to) return `${from} s.d. ${to}`;
+  if (from) return `dari ${from}`;
+  if (to) return `sampai ${to}`;
+  return "semua periode";
+}
+
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -78,7 +92,7 @@ function rowValues(r: ConfirmedExportRow): (string | number)[] {
   ];
 }
 
-export function downloadConfirmedCsv(rows: ConfirmedExportRow[]) {
+export function downloadConfirmedCsv(rows: ConfirmedExportRow[], from?: string, to?: string) {
   const csvCell = (value: string | number) => {
     const s = String(value ?? "");
     if (/[;"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
@@ -87,11 +101,11 @@ export function downloadConfirmedCsv(rows: ConfirmedExportRow[]) {
   const lines = [HEADERS.join(";"), ...rows.map((r) => rowValues(r).map(csvCell).join(";"))];
   triggerDownload(
     new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" }),
-    `gsf-terkonfirmasi-${fileDay()}.csv`,
+    `gsf-terkonfirmasi-${fileStamp(from, to)}.csv`,
   );
 }
 
-export function downloadConfirmedExcel(rows: ConfirmedExportRow[]) {
+export function downloadConfirmedExcel(rows: ConfirmedExportRow[], from?: string, to?: string) {
   const numberIdx = new Set([4, 5, 6, 8, 10]);
   const cells = (values: (string | number)[], header = false) =>
     values
@@ -118,18 +132,22 @@ ${body}
 </Workbook>`;
   triggerDownload(
     new Blob(["\uFEFF" + xml], { type: "application/vnd.ms-excel" }),
-    `gsf-terkonfirmasi-${fileDay()}.xls`,
+    `gsf-terkonfirmasi-${fileStamp(from, to)}.xls`,
   );
 }
 
-export async function downloadConfirmedPdf(rows: ConfirmedExportRow[]) {
+export async function downloadConfirmedPdf(rows: ConfirmedExportRow[], from?: string, to?: string) {
   const { jsPDF } = await import("jspdf");
   const { autoTable } = await import("jspdf-autotable");
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   doc.setFontSize(14);
   doc.text("Golden Satya Fair - Data terkonfirmasi", 14, 14);
   doc.setFontSize(9);
-  doc.text(`Diunduh ${new Date().toLocaleString("id-ID")} · ${rows.length} pesanan`, 14, 20);
+  doc.text(
+    `Periode ${rangeLabel(from, to)} · Diunduh ${new Date().toLocaleString("id-ID")} · ${rows.length} pesanan`,
+    14,
+    20,
+  );
   autoTable(doc, {
     startY: 24,
     head: [HEADERS as unknown as string[]],
@@ -153,5 +171,5 @@ export async function downloadConfirmedPdf(rows: ConfirmedExportRow[]) {
     alternateRowStyles: { fillColor: [248, 244, 236] },
     margin: { left: 10, right: 10 },
   });
-  doc.save(`gsf-terkonfirmasi-${fileDay()}.pdf`);
+  doc.save(`gsf-terkonfirmasi-${fileStamp(from, to)}.pdf`);
 }

@@ -1,11 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 
-export const fetchConfirmedExport = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireStaff } = await import("@/lib/staff.server");
-  const { listConfirmedExport } = await import("@/lib/orders.server");
-  await requireStaff(["admin", "crew"]);
-  return listConfirmedExport();
-});
+export const fetchConfirmedExport = createServerFn({ method: "POST" })
+  .validator((input: { from?: string; to?: string } | undefined) => ({
+    from: input?.from?.trim() || "",
+    to: input?.to?.trim() || "",
+  }))
+  .handler(async ({ data }) => {
+    const { requireStaff } = await import("@/lib/staff.server");
+    const { listConfirmedExport } = await import("@/lib/orders.server");
+    await requireStaff(["admin", "crew"]);
+    return listConfirmedExport({ from: data.from || null, to: data.to || null });
+  });
 
 export const fetchDashboard = createServerFn({ method: "GET" }).handler(async () => {
   const { requireStaff } = await import("@/lib/staff.server");

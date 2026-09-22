@@ -103,12 +103,39 @@ async function ensureIdentitySchema(): Promise<void> {
   await sql.query("alter table orders add column if not exists cancelled_at timestamptz");
   await sql.query("alter table orders add column if not exists cancelled_by text");
   try {
-    await sql.query("alter table orders drop constraint if exists orders_status_check");
-    await sql.query(
-      "alter table orders add constraint orders_status_check check (status in ('awaiting_payment', 'awaiting_confirm', 'confirmed', 'cancelled'))",
-    );
+    await sql.query(`
+      do $c$
+      declare r record;
+      begin
+        for r in
+          select c.conname
+          from pg_constraint c
+          join pg_class t on t.oid = c.conrelid
+          where t.relname = 'orders' and c.contype = 'c'
+            and pg_get_constraintdef(c.oid) ilike '%status%'
+        loop
+          execute format('alter table orders drop constraint %I', r.conname);
+        end loop;
+        begin
+          execute $s$
+            alter table orders add constraint orders_status_check
+            check (status in ('awaiting_payment', 'awaiting_confirm', 'confirmed', 'cancelled'))
+          $s$;
+        exception
+          when duplicate_object then null;
+        end;
+      end
+      $c$;
+    `);
   } catch {
-    /* already applied */
+    try {
+      await sql.query("alter table orders drop constraint if exists orders_status_check");
+      await sql.query(
+        "alter table orders add constraint orders_status_check check (status in ('awaiting_payment', 'awaiting_confirm', 'confirmed', 'cancelled'))",
+      );
+    } catch {
+      /* already applied */
+    }
   }
   try {
     await sql.query("drop index if exists orders_email_lower_uidx");
@@ -126,19 +153,23 @@ async function ensureIdentitySchema(): Promise<void> {
 }
 
 export async function expireUnpaidOrders(): Promise<number> {
-  await ensureIdentitySchema();
-  const sql = await getSql();
-  const updated = await sql<{ id: number }>`
-    update orders
-    set status = ${"cancelled"},
-        cancelled_at = now(),
-        cancelled_by = ${"system"}
-    where status = ${"awaiting_payment"}
-      and (proof_data is null or proof_data = '')
-      and created_at < now() - (${AUTO_CANCEL_MINUTES}::int * interval '1 minute')
-    returning id
-  `;
-  return updated.length;
+  try {
+    await ensureIdentitySchema();
+    const sql = await getSql();
+    const updated = await sql<{ id: number }>`
+      update orders
+      set status = ${"cancelled"},
+          cancelled_at = now(),
+          cancelled_by = ${"system"}
+      where status = ${"awaiting_payment"}
+        and (proof_data is null or proof_data = '')
+        and created_at < now() - interval '1 minute' * ${AUTO_CANCEL_MINUTES}
+      returning id
+    `;
+    return updated.length;
+  } catch {
+    return 0;
+  }
 }
 
 async function assertFreshIdentity(email: string, waNorm: string): Promise<void> {
@@ -270,10 +301,19 @@ export async function createOrder(input: {
 export async function getPublicOrder(publicId: string): Promise<PublicOrder> {
   await expireUnpaidOrders();
   const sql = await getSql();
-  const rows = await sql<OrderRow>`select * from orders where public_id = ${publicId} limit 1`;
+  const rows = await sql<OrderRow & { has_proof_flag: number }>`
+    select
+      id, public_id, email, full_name, address, whatsapp, referral_code,
+      qty_vvip, qty_vip, qty_festival, base_amount, unique_code, total_amount,
+      status, proof_mime, proof_name, confirmed_at, created_at, stage_id,
+      case when proof_data is null or proof_data = '' then 0 else 1 end as has_proof_flag
+    from orders
+    where public_id = ${publicId}
+    limit 1
+  `;
   const row = rows[0];
   if (!row) throw new Error("Pesanan tidak ditemukan");
-  return toPublic(row, true);
+  return toPublic({ ...row, proof_data: row.has_proof_flag ? "1" : null }, true);
 }
 
 export async function saveProof(input: {
@@ -419,7 +459,10 @@ export async function listAgentOrders(referralCode: string): Promise<PublicOrder
   return out;
 }
 
-export async function listConfirmedExport(): Promise<
+export async function listConfirmedExport(range?: {
+  from?: string | null;
+  to?: string | null;
+}): Promise<
   {
     fullName: string;
     email: string;
@@ -438,9 +481,13 @@ export async function listConfirmedExport(): Promise<
   }[]
 > {
   const sql = await getSql();
+  const from = range?.from?.trim() ? new Date(`${range.from}T00:00:00+07:00`).toISOString() : null;
+  const to = range?.to?.trim() ? new Date(`${range.to}T23:59:59.999+07:00`).toISOString() : null;
   const rows = await sql<OrderRow>`
     select * from orders
     where status = 'confirmed'
+      and (${from}::timestamptz is null or confirmed_at >= ${from}::timestamptz)
+      and (${to}::timestamptz is null or confirmed_at <= ${to}::timestamptz)
     order by confirmed_at desc, id desc
   `;
   const out = [];

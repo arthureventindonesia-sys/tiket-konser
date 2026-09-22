@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Copy } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { AdminContacts } from "@/components/admin-contacts";
@@ -21,16 +21,22 @@ function TiketPage() {
   const [order, setOrder] = useState<PublicOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const orderRef = useRef<PublicOrder | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const load = () =>
       fetchOrder({ data: orderId })
         .then((o) => {
-          if (!cancelled) setOrder(o);
+          if (cancelled) return;
+          orderRef.current = o;
+          setOrder(o);
+          setError(null);
         })
         .catch((e) => {
-          if (!cancelled) setError(e instanceof Error ? e.message : "Tidak ditemukan");
+          if (cancelled || orderRef.current) return;
+          const msg = e instanceof Error ? e.message : "Tidak ditemukan";
+          setError(msg === "Failed to fetch" ? "Gagal memuat status. Coba muat ulang halaman." : msg);
         });
     void load();
     const t = window.setInterval(() => {
