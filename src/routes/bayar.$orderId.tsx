@@ -74,21 +74,23 @@ function BayarPage() {
             <div className="mx-auto mt-4 overflow-hidden rounded-lg bg-bg">
               <img src={EVENT.qris} alt="QRIS statis Golden Satya Fair" className="w-full" />
             </div>
-            <p className="mt-4 text-center text-xs text-subtle">Nominal transfer (termasuk kode unik)</p>
-            <p className="text-center font-mono text-2xl tabular-nums text-bg">
+            <p className="mt-4 text-center text-sm font-bold uppercase tracking-[0.14em] text-bg">
+              Nominal transfer (termasuk kode unik)
+            </p>
+            <p className="mt-1 text-center font-mono text-3xl font-bold tabular-nums text-bg">
               {formatRupiah(order.totalAmount)}
             </p>
-            <p className="mt-1 text-center text-xs text-subtle">
+            <p className="mt-2 text-center text-base font-bold leading-snug text-bg">
               Harga {formatRupiah(order.baseAmount)} + kode {order.uniqueCode.toString().padStart(3, "0")}
             </p>
             <Button
               type="button"
-              variant="outline"
-              className="mx-auto mt-3 flex border-gold/40 bg-transparent text-bg hover:bg-bg/10"
+              size="lg"
+              className="mt-4 w-full text-base font-bold tracking-wide"
               onClick={() => void copyNominal(order.totalAmount)}
             >
-              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-              {copied ? "Tersalin" : "Salin nominal"}
+              {copied ? <Check className="size-5" /> : <Copy className="size-5" />}
+              {copied ? "NOMINAL TERSALIN" : "SALIN NOMINAL"}
             </Button>
             <p className="mt-4 rounded-lg border border-gold/50 bg-gold/15 px-3 py-2 text-center text-xs font-medium leading-relaxed text-bg">
               Pastikan nominal sesuai dengan tagihan di sistem.
