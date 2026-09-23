@@ -30,6 +30,15 @@ export const fetchConfirmations = createServerFn({ method: "GET" }).handler(asyn
   }));
 });
 
+export const fetchOrderProof = createServerFn({ method: "POST" })
+  .validator((orderId: number) => orderId)
+  .handler(async ({ data }) => {
+    const { requireStaff } = await import("@/lib/staff.server");
+    const { getOrderProof } = await import("@/lib/orders.server");
+    await requireStaff(["admin", "crew"]);
+    return getOrderProof(data);
+  });
+
 export const confirmPayment = createServerFn({ method: "POST" })
   .validator((orderId: number) => orderId)
   .handler(async ({ data }) => {

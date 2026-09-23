@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { copyText } from "@/lib/agent-qr";
 import { TICKET_LABEL, TICKET_TYPES, type TicketTypeId } from "@/lib/event";
 import { formatDateTime, formatRupiah, waMeUrl } from "@/lib/format";
-import { cancelPayment, confirmPayment, fetchConfirmations } from "@/lib/fn/admin";
+import { cancelPayment, confirmPayment, fetchConfirmations, fetchOrderProof } from "@/lib/fn/admin";
 import type { AdminOrder } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -103,6 +103,27 @@ function KonfirmasiPage() {
   const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   const from = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
   const to = Math.min(safePage * PAGE_SIZE, filtered.length);
+
+  async function openProof(order: AdminOrder) {
+    if (order.proofData) {
+      setPreview(order.proofData);
+      return;
+    }
+    setBusyId(order.id);
+    try {
+      const data = await fetchOrderProof({ data: order.id });
+      if (!data) {
+        toast.error("Bukti transfer tidak ditemukan");
+        return;
+      }
+      setOrders((prev) => prev.map((item) => (item.id === order.id ? { ...item, proofData: data } : item)));
+      setPreview(data);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal membuka bukti");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   async function onConfirm(id: number) {
     setBusyId(id);
@@ -281,18 +302,17 @@ function KonfirmasiPage() {
                       {cancelled ? "Dibatalkan" : confirmed ? "Terkonfirmasi" : o.hasProof ? "Menunggu" : "Belum unggah"}
                     </Badge>
                   </div>
-                  {o.proofData ? (
-                    <button
+                  {o.hasProof ? (
+                    <Button
                       type="button"
-                      className="mt-3 overflow-hidden rounded-md"
-                      onClick={() => setPreview(o.proofData)}
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => void openProof(o)}
+                      disabled={busyId === o.id}
                     >
-                      <img
-                        src={o.proofData}
-                        alt={`Bukti ${o.fullName}`}
-                        className="h-28 w-auto max-w-full object-cover outline outline-1 -outline-offset-1 outline-fg/10"
-                      />
-                    </button>
+                      {busyId === o.id ? "Membuka bukti…" : "Lihat bukti transfer"}
+                    </Button>
                   ) : (
                     <p className="mt-3 text-sm text-subtle">Bukti transfer belum diunggah.</p>
                   )}
@@ -394,11 +414,10 @@ function KonfirmasiPage() {
         </>
       )}
       {preview ? (
-        <button
-          type="button"
+        <div
           className="fixed inset-0 z-50 flex h-[100dvh] w-[100dvw] items-center justify-center bg-bg/90 p-3 sm:p-6"
           onClick={() => setPreview(null)}
-          aria-label="Tutup pratinjau bukti transfer"
+          role="presentation"
         >
           <img
             src={preview}
@@ -410,8 +429,9 @@ function KonfirmasiPage() {
               maxWidth: "calc(100dvw - 1.5rem)",
               maxHeight: "calc(100dvh - 1.5rem)",
             }}
+            onClick={(e) => e.stopPropagation()}
           />
-        </button>
+        </div>
       ) : null}
     </div>
   );

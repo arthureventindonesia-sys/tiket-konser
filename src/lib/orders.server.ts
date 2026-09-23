@@ -54,14 +54,19 @@ async function toPublic(
   row: OrderRow,
   includeTickets: boolean,
   includeQr = true,
+  ticketMap?: Map<number, PublicOrder["tickets"]>,
 ): Promise<PublicOrder> {
   const tickets: PublicOrder["tickets"] = [];
   if (includeTickets && row.status === "confirmed") {
-    const sql = await getSql();
-    const rows = await sql<{ ticket_type: TicketTypeId; code: string }>`
-      select ticket_type, code from tickets where order_id = ${row.id} order by id
-    `;
-    for (const t of rows) tickets.push({ type: t.ticket_type, code: t.code });
+    if (ticketMap) {
+      tickets.push(...(ticketMap.get(row.id) ?? []));
+    } else {
+      const sql = await getSql();
+      const rows = await sql<{ ticket_type: TicketTypeId; code: string }>`
+        select ticket_type, code from tickets where order_id = ${row.id} order by id
+      `;
+      for (const t of rows) tickets.push({ type: t.ticket_type, code: t.code });
+    }
   }
   return {
     publicId: row.public_id,
@@ -426,10 +431,14 @@ export async function cancelOrder(orderId: number, staffId: string): Promise<Adm
 
 export async function listAdminOrders(): Promise<AdminOrder[]> {
   await expireUnpaidOrders();
-  await ensureIdentitySchema();
   const sql = await getSql();
-  const rows = await sql<OrderRow>`
-    select * from orders
+  const rows = await sql<OrderRow & { has_proof: boolean }>`
+    select
+      id, public_id, email, full_name, address, whatsapp, referral_code,
+      qty_vvip, qty_vip, qty_festival, base_amount, unique_code, total_amount,
+      status, proof_mime, proof_name, confirmed_at, created_at, stage_id,
+      (proof_data is not null) as has_proof
+    from orders
     order by
       case status
         when 'awaiting_confirm' then 0
@@ -439,12 +448,36 @@ export async function listAdminOrders(): Promise<AdminOrder[]> {
       end,
       created_at desc
   `;
+  const confirmedIds = rows.filter((row) => row.status === "confirmed").map((row) => row.id);
+  const ticketMap = new Map<number, PublicOrder["tickets"]>();
+  if (confirmedIds.length > 0) {
+    const tickets = await sql.query<{ order_id: number; ticket_type: TicketTypeId; code: string }>(
+      "select order_id, ticket_type, code from tickets where order_id = any($1::int[]) order by id",
+      [confirmedIds],
+    );
+    for (const ticket of tickets) {
+      const list = ticketMap.get(ticket.order_id) ?? [];
+      list.push({ type: ticket.ticket_type, code: ticket.code });
+      ticketMap.set(ticket.order_id, list);
+    }
+  }
   const out: AdminOrder[] = [];
   for (const row of rows) {
-    const pub = await toPublic(row, true, false);
-    out.push(toAdmin(pub, row));
+    const pub = await toPublic({ ...row, proof_data: row.has_proof ? "1" : null }, true, false, ticketMap);
+    out.push({
+      ...toAdmin(pub, { ...row, proof_data: null }),
+      hasProof: Boolean(row.has_proof),
+    });
   }
   return out;
+}
+
+export async function getOrderProof(orderId: number): Promise<string | null> {
+  const sql = await getSql();
+  const rows = await sql<{ proof_data: string | null }>`
+    select proof_data from orders where id = ${orderId} limit 1
+  `;
+  return rows[0]?.proof_data || null;
 }
 
 export async function listAgentOrders(referralCode: string): Promise<PublicOrder[]> {
