@@ -8,6 +8,7 @@ import {
   type SaleOffer,
   type StageId,
   type StageQuota,
+  type StageSales,
   type TicketStage,
 } from "@/lib/stages";
 
@@ -24,6 +25,9 @@ type StageRow = {
   price_vvip: number;
   price_vip: number;
   price_festival: number;
+  sell_vvip?: boolean | null;
+  sell_vip?: boolean | null;
+  sell_festival?: boolean | null;
 };
 
 function emptyQuota(): StageQuota {
@@ -59,6 +63,20 @@ async function ensureStagePrices(): Promise<void> {
   await sql.query(
     "alter table ticket_stages add column if not exists price_festival int not null default 350000",
   );
+  await sql.query("alter table ticket_stages add column if not exists sell_vvip boolean");
+  await sql.query("alter table ticket_stages add column if not exists sell_vip boolean");
+  await sql.query("alter table ticket_stages add column if not exists sell_festival boolean");
+  await sql.query(`
+    update ticket_stages
+    set sell_vvip = case when id in ('early_bird', 'presale_1') then false else true end
+    where sell_vvip is null
+  `);
+  await sql.query("update ticket_stages set sell_vip = true where sell_vip is null");
+  await sql.query("update ticket_stages set sell_festival = true where sell_festival is null");
+  for (const col of ["sell_vvip", "sell_vip", "sell_festival"]) {
+    await sql.query(`alter table ticket_stages alter column ${col} set default true`);
+    await sql.query(`alter table ticket_stages alter column ${col} set not null`);
+  }
   schemaReady = true;
 }
 
@@ -80,9 +98,20 @@ async function soldByStage(stageId: StageId): Promise<StageQuota> {
   };
 }
 
+function salesFrom(row: StageRow): StageSales {
+  const def = stageDef(row.id);
+  const fallback = new Set<TicketTypeId>(def?.allowed ?? ["vvip", "vip", "festival"]);
+  return {
+    vvip: row.sell_vvip == null ? fallback.has("vvip") : Boolean(row.sell_vvip),
+    vip: row.sell_vip == null ? fallback.has("vip") : Boolean(row.sell_vip),
+    festival: row.sell_festival == null ? fallback.has("festival") : Boolean(row.sell_festival),
+  };
+}
+
 function toStage(row: StageRow, sold: StageQuota): TicketStage {
   const def = stageDef(row.id);
-  const allowed = [...(def?.allowed ?? ["vvip", "vip", "festival"])] as TicketTypeId[];
+  const onSale = salesFrom(row);
+  const allowed = (["vvip", "vip", "festival"] as const).filter((type) => onSale[type]);
   const enabled = Boolean(row.enabled);
   const startsAt = row.starts_at;
   const endsAt = row.ends_at;
@@ -97,6 +126,7 @@ function toStage(row: StageRow, sold: StageQuota): TicketStage {
     quota: quotaFrom(row),
     sold,
     price: priceFrom(row),
+    onSale,
     allowed,
     live: status === "live",
     status,
@@ -162,6 +192,7 @@ export async function updateStage(input: {
   endsAt: string | null;
   quota: StageQuota;
   price: StageQuota;
+  onSale: StageSales;
 }): Promise<TicketStage> {
   await ensureStagePrices();
   const def = stageDef(input.id);
@@ -169,18 +200,17 @@ export async function updateStage(input: {
   if (input.startsAt && input.endsAt && new Date(input.startsAt) >= new Date(input.endsAt)) {
     throw new Error("Waktu mulai harus sebelum waktu selesai");
   }
-  const allowed = def.allowed as readonly TicketTypeId[];
   const quota = { ...input.quota };
   const price = { ...input.price };
   for (const type of ["vvip", "vip", "festival"] as const) {
     quota[type] = Math.max(0, Math.floor(Number(quota[type]) || 0));
     price[type] = Math.max(0, Math.floor(Number(price[type]) || 0));
-    if (!allowed.includes(type)) {
-      quota[type] = 0;
-      price[type] = 0;
-    } else if (price[type] < 1) {
+    if (input.onSale[type] && price[type] < 1) {
       throw new Error(`Harga ${TICKET_LABEL[type]} wajib diisi`);
     }
+  }
+  if (!Object.values(input.onSale).some(Boolean)) {
+    throw new Error("Aktifkan minimal satu jenis tiket");
   }
   const sql = await getSql();
   const updated = await sql<StageRow>`
@@ -193,7 +223,10 @@ export async function updateStage(input: {
         quota_festival = ${quota.festival},
         price_vvip = ${price.vvip},
         price_vip = ${price.vip},
-        price_festival = ${price.festival}
+        price_festival = ${price.festival},
+        sell_vvip = ${input.onSale.vvip},
+        sell_vip = ${input.onSale.vip},
+        sell_festival = ${input.onSale.festival}
     where id = ${input.id}
     returning *
   `;

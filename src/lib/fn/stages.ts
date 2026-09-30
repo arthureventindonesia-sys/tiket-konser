@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { StageId, StageQuota } from "@/lib/stages";
+import type { StageId, StageQuota, StageSales } from "@/lib/stages";
 
 export const fetchSaleOffer = createServerFn({ method: "GET" }).handler(async () => {
   const { getSaleOffer } = await import("@/lib/stages.server");
@@ -21,6 +21,7 @@ export const saveStage = createServerFn({ method: "POST" })
     endsAt: string | null;
     quota: StageQuota;
     price: StageQuota;
+    onSale: StageSales;
   }) => data)
   .handler(async ({ data }) => {
     const { requireStaff } = await import("@/lib/staff.server");

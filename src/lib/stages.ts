@@ -12,6 +12,7 @@ export type StageId = (typeof TICKET_STAGES)[number]["id"];
 export type StageStatus = "off" | "scheduled" | "live" | "ended";
 
 export type StageQuota = Record<TicketTypeId, number>;
+export type StageSales = Record<TicketTypeId, boolean>;
 
 export type TicketStage = {
   id: StageId;
@@ -23,6 +24,7 @@ export type TicketStage = {
   quota: StageQuota;
   sold: StageQuota;
   price: StageQuota;
+  onSale: StageSales;
   allowed: TicketTypeId[];
   live: boolean;
   status: StageStatus;

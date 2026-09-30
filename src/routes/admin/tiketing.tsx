@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { TICKET_LABEL, type TicketTypeId } from "@/lib/event";
 import { formatGroupedId, fromDatetimeLocalWib, parseGroupedId, toDatetimeLocalWib } from "@/lib/format";
 import { fetchStages, saveStage } from "@/lib/fn/stages";
-import { remainingOf, type StageQuota, type TicketStage } from "@/lib/stages";
+import { remainingOf, type StageQuota, type StageSales, type TicketStage } from "@/lib/stages";
 
 export const Route = createFileRoute("/admin/tiketing")({
   component: TiketingPage,
@@ -46,7 +46,7 @@ function TiketingPage() {
         <p className="text-xs uppercase tracking-[0.24em] text-gold">Tiketing</p>
         <h1 className="mt-1 font-display text-3xl">Tahap penjualan</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted">
-          Atur kuota, harga, waktu, dan status tiap tahap. Early Bird dan Presale 1 hanya VIP dan Festival. Pembeli
+          Atur kuota, harga, waktu, dan jenis tiket yang dijual di tiap tahap. Pembeli
           otomatis masuk ke tahap yang sedang berlangsung.
         </p>
       </div>
@@ -86,6 +86,7 @@ function StageCard({
   const [endsAt, setEndsAt] = useState(toDatetimeLocalWib(stage.endsAt));
   const [quota, setQuota] = useState<StageQuota>(stage.quota);
   const [price, setPrice] = useState<StageQuota>(stage.price);
+  const [onSale, setOnSale] = useState<StageSales>(stage.onSale);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -94,6 +95,7 @@ function StageCard({
     setEndsAt(toDatetimeLocalWib(stage.endsAt));
     setQuota(stage.quota);
     setPrice(stage.price);
+    setOnSale(stage.onSale);
   }, [stage]);
 
   async function onSave(e: React.FormEvent) {
@@ -108,6 +110,7 @@ function StageCard({
           endsAt: fromDatetimeLocalWib(endsAt),
           quota,
           price,
+          onSale,
         },
       });
       onSaved(next);
@@ -128,7 +131,9 @@ function StageCard({
         <div>
           <h2 className="font-display text-2xl">{stage.label}</h2>
           <p className="mt-1 text-sm text-subtle">
-            {stage.allowed.map((t) => TICKET_LABEL[t]).join(" · ")}
+            {stage.allowed.length > 0
+              ? stage.allowed.map((t) => TICKET_LABEL[t]).join(" · ")
+              : "Tidak ada jenis tiket yang dijual"}
           </p>
         </div>
         <Badge tone={tone}>{STATUS_LABEL[stage.status]}</Badge>
@@ -163,15 +168,25 @@ function StageCard({
 
       <div className="grid gap-3 sm:grid-cols-3">
         {(["vvip", "vip", "festival"] as TicketTypeId[]).map((type) => {
-          const allowed = stage.allowed.includes(type);
+          const selling = onSale[type];
           const sold = stage.sold[type];
           const sisa = remainingOf(quota[type], sold);
           return (
             <div
               key={type}
-              className={`rounded-lg border border-border p-3 ${allowed ? "bg-bg" : "opacity-50"}`}
+              className={`rounded-lg border border-border p-3 ${selling ? "bg-bg" : "opacity-60"}`}
             >
-              <p className="text-xs uppercase tracking-[0.16em] text-subtle">{TICKET_LABEL[type]}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs uppercase tracking-[0.16em] text-subtle">{TICKET_LABEL[type]}</p>
+                <Badge tone={selling ? "success" : "muted"}>{selling ? "Aktif" : "Nonaktif"}</Badge>
+              </div>
+              <label className="mt-2 flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={selling}
+                  onCheckedChange={(v) => setOnSale((prev) => ({ ...prev, [type]: v === true }))}
+                />
+                Jual jenis ini
+              </label>
               <Label htmlFor={`${stage.id}-p-${type}`} className="mt-2 block text-xs text-muted">
                 Harga
               </Label>
@@ -182,9 +197,9 @@ function StageCard({
                 <Input
                   id={`${stage.id}-p-${type}`}
                   inputMode="numeric"
-                  disabled={!allowed}
+                  disabled={!selling}
                   className="pl-9 font-mono tabular-nums"
-                  value={allowed ? formatGroupedId(price[type]) : ""}
+                  value={formatGroupedId(price[type])}
                   onChange={(e) =>
                     setPrice((prev) => ({ ...prev, [type]: parseGroupedId(e.target.value) }))
                   }
@@ -199,14 +214,14 @@ function StageCard({
                 type="number"
                 min={0}
                 step={1}
-                disabled={!allowed}
-                value={allowed ? quota[type] : 0}
+                disabled={!selling}
+                value={quota[type]}
                 onChange={(e) =>
                   setQuota((prev) => ({ ...prev, [type]: Number(e.target.value) }))
                 }
               />
               <p className="mt-2 font-mono text-xs tabular-nums text-muted">
-                Terjual {sold} · Sisa {allowed ? (quota[type] > 0 ? sisa : "tak terbatas") : 0}
+                Terjual {sold} · Sisa {selling ? (quota[type] > 0 ? sisa : "tak terbatas") : "—"}
               </p>
             </div>
           );
