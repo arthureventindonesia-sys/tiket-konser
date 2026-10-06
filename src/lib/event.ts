@@ -1,7 +1,7 @@
 export const EVENT = {
   name: "Golden Satya Fair",
   shortName: "GSF",
-  tagline: "Sal Priadi · Bilal Indrajaya",
+  tagline: "Sal Priadi · Bilal Indrajaya · The Changcuters",
   dateLabel: "Senin, 9 November 2026",
   timeLabel: "19.00 WIB",
   venue: "Perumahan Golden Star Lumina",
@@ -21,6 +21,7 @@ export const ADMIN_CONTACTS = [
 export const GUESTS = [
   { name: "Sal Priadi", logo: "/images/logo-sal.png", photo: "/images/guest-sal.jpg" },
   { name: "Bilal Indrajaya", logo: "/images/logo-bilal.png", photo: "/images/guest-bilal.jpg" },
+  { name: "The Changcuters", photo: "/images/guest-changcuters.jpg" },
 ] as const;
 
 export const PARTNERS = [

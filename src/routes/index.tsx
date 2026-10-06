@@ -56,26 +56,30 @@ function Home() {
       <section className="border-t border-border bg-surface">
         <div className="mx-auto max-w-5xl px-5 py-16 md:px-8 md:py-20">
           <p className="text-xs uppercase tracking-[0.24em] text-gold">Guest star</p>
-          <h2 className="mt-2 font-display text-3xl md:text-4xl">Satu malam, dua panggung suara</h2>
-          <div className="mt-10 grid gap-5 md:grid-cols-2">
+          <h2 className="mt-2 font-display text-3xl md:text-4xl">Satu malam, tiga nama di panggung</h2>
+          <div className="mt-10 grid gap-5 md:grid-cols-3">
             {GUESTS.map((g) => (
               <article
                 key={g.name}
-                className="relative isolate min-h-[420px] overflow-hidden rounded-xl border border-border md:min-h-[520px]"
+                className="relative isolate min-h-[480px] overflow-hidden rounded-xl border border-border md:min-h-[560px]"
               >
                 <img
                   src={g.photo}
-                  alt=""
-                  className="absolute inset-0 size-full object-cover object-[center_18%]"
+                  alt={g.name}
+                  className="absolute inset-0 size-full object-cover object-center"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/25 to-transparent" />
-                <div className="relative z-10 flex min-h-[420px] items-end justify-center px-8 pb-8 md:min-h-[520px]">
-                  <img
-                    src={g.logo}
-                    alt={g.name}
-                    className="h-12 w-full max-w-[240px] object-contain drop-shadow md:h-14"
-                  />
-                </div>
+                {"logo" in g && g.logo ? (
+                  <>
+                    <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/25 to-transparent" />
+                    <div className="relative z-10 flex min-h-[480px] items-end justify-center px-6 pb-8 md:min-h-[560px]">
+                      <img
+                        src={g.logo}
+                        alt=""
+                        className="h-12 w-full max-w-[220px] object-contain drop-shadow md:h-14"
+                      />
+                    </div>
+                  </>
+                ) : null}
               </article>
             ))}
           </div>
