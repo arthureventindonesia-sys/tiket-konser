@@ -7,7 +7,7 @@ export const EVENT = {
   venue: "Perumahan Golden Star Lumina",
   city: "Bumiayu",
   merchantName: "GOLDEN SATYA FAIR",
-  nmid: "ID1026497312623",
+  nmid: "ID1026611549936",
   logo: "/images/logo-gsf.png",
   layout: "/images/layout-konser.jpg",
   qris: "/images/qris-statis.jpg",

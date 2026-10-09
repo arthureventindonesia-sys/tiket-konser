@@ -76,7 +76,7 @@ function BayarPage() {
             <div className="grid min-h-0 flex-1 grid-rows-[minmax(120px,1fr)_auto] gap-3">
               <div className="grid min-h-0 place-items-center overflow-hidden rounded-xl bg-white p-2">
                 <img
-                  src={`${EVENT.qris}?v=3`}
+                  src={`${EVENT.qris}?v=4`}
                   alt="QRIS Golden Satya Fair"
                   className="max-h-full max-w-full object-contain object-center"
                 />
