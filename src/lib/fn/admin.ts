@@ -53,7 +53,7 @@ export const placeFastTrack = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { requireStaff } = await import("@/lib/staff.server");
     const { createOrder } = await import("@/lib/orders.server");
-    await requireStaff(["admin"]);
+    await requireStaff(["admin", "crew"]);
     return createOrder({ ...data, fastTrack: true });
   });
 

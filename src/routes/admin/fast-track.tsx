@@ -7,8 +7,8 @@ import { Label } from "@/components/ui/label";
 import { EVENT, TICKET_TYPES, type TicketTypeId } from "@/lib/event";
 import { formatRupiah, uniqueCodeFromWhatsapp } from "@/lib/format";
 import { placeFastTrack } from "@/lib/fn/admin";
-import { getStaffSession, listStaffUsers } from "@/lib/fn/staff";
-import { fetchStages } from "@/lib/fn/stages";
+import { getStaffSession } from "@/lib/fn/staff";
+import { fetchFastTrackContext } from "@/lib/fn/stages";
 import type { TicketStage } from "@/lib/stages";
 
 export const Route = createFileRoute("/admin/fast-track")({
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/admin/fast-track")({
 function FastTrackPage() {
   const navigate = useNavigate();
   const [allowed, setAllowed] = useState(false);
-  const [stage, setStage] = useState<TicketStage | null>(null);
+  const [stage, setStage] = useState<Pick<TicketStage, "id" | "label" | "allowed" | "fastTrackPrice"> | null>(null);
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [address, setAddress] = useState("");
@@ -35,8 +35,8 @@ function FastTrackPage() {
           void navigate({ to: "/login" });
           return;
         }
-        if (staff.role !== "admin") {
-          toast.error("Fast Track hanya untuk admin");
+        if (staff.role !== "admin" && staff.role !== "crew") {
+          toast.error("Fast Track hanya untuk admin dan crew");
           void navigate({ to: "/admin" });
           return;
         }
@@ -45,21 +45,15 @@ function FastTrackPage() {
       .catch(() => {
         void navigate({ to: "/login" });
       });
-    fetchStages()
-      .then((stages) => {
-        setStage(stages.find((item) => item.live) ?? null);
+    fetchFastTrackContext()
+      .then((context) => {
+        setStage(context.stage);
+        setAgents(context.agents);
       })
-      .catch(() => setStage(null));
-    listStaffUsers()
-      .then((users) => {
-        setAgents(
-          users
-            .filter((user) => user.role === "agent" && user.referralCode)
-            .map((user) => ({ name: user.name, code: user.referralCode! }))
-            .sort((a, b) => a.name.localeCompare(b.name, "id")),
-        );
-      })
-      .catch(() => setAgents([]));
+      .catch(() => {
+        setStage(null);
+        setAgents([]);
+      });
   }, [navigate]);
 
   const activeTypes = TICKET_TYPES.filter((type) => stage?.allowed.includes(type.id));

@@ -54,11 +54,11 @@ function AdminLayout() {
   if (staff.role === "admin" || staff.role === "crew") {
     links.push({ to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true });
     links.push({ to: "/admin/konfirmasi", label: "Konfirmasi", icon: TicketCheck, exact: false });
+    links.push({ to: "/admin/fast-track", label: "Fast Track", icon: Zap, exact: false });
   }
   if (staff.role === "admin") {
     links.push({ to: "/admin/tiketing", label: "Tiketing", icon: Ticket, exact: false });
     links.push({ to: "/admin/harga-fast-track", label: "Harga Fast Track", icon: BadgeDollarSign, exact: false });
-    links.push({ to: "/admin/fast-track", label: "Fast Track", icon: Zap, exact: false });
     links.push({ to: "/admin/pengguna", label: "Pengguna", icon: Users, exact: false });
   }
   if (staff.role !== "tiketbox") {
