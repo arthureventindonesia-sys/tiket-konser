@@ -39,6 +39,24 @@ export const fetchOrderProof = createServerFn({ method: "POST" })
     return getOrderProof(data);
   });
 
+export const placeFastTrack = createServerFn({ method: "POST" })
+  .validator((data: {
+    email: string;
+    fullName: string;
+    address: string;
+    whatsapp: string;
+    referralCode?: string;
+    qtyVvip: number;
+    qtyVip: number;
+    qtyFestival: number;
+  }) => data)
+  .handler(async ({ data }) => {
+    const { requireStaff } = await import("@/lib/staff.server");
+    const { createOrder } = await import("@/lib/orders.server");
+    await requireStaff(["admin"]);
+    return createOrder({ ...data, fastTrack: true });
+  });
+
 export const confirmPayment = createServerFn({ method: "POST" })
   .validator((orderId: number) => orderId)
   .handler(async ({ data }) => {

@@ -47,7 +47,7 @@ function TiketingPage() {
         <h1 className="mt-1 font-display text-3xl">Tahap penjualan</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted">
           Atur kuota, harga, waktu, dan jenis tiket yang dijual di tiap tahap. Pembeli
-          otomatis masuk ke tahap yang sedang berlangsung.
+          otomatis masuk ke tahap yang sedang berlangsung. Harga Fast Track diatur di panel terpisah.
         </p>
       </div>
       {liveCount > 1 ? (

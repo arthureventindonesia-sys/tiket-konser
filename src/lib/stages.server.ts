@@ -25,6 +25,9 @@ type StageRow = {
   price_vvip: number;
   price_vip: number;
   price_festival: number;
+  ft_price_vvip?: number | null;
+  ft_price_vip?: number | null;
+  ft_price_festival?: number | null;
   sell_vvip?: boolean | null;
   sell_vip?: boolean | null;
   sell_festival?: boolean | null;
@@ -47,6 +50,15 @@ function priceFrom(row: StageRow): StageQuota {
     vvip: Number(row.price_vvip ?? TICKET_PRICE.vvip),
     vip: Number(row.price_vip ?? TICKET_PRICE.vip),
     festival: Number(row.price_festival ?? TICKET_PRICE.festival),
+  };
+}
+
+function fastTrackPriceFrom(row: StageRow): StageQuota {
+  const price = priceFrom(row);
+  return {
+    vvip: Number(row.ft_price_vvip ?? price.vvip),
+    vip: Number(row.ft_price_vip ?? price.vip),
+    festival: Number(row.ft_price_festival ?? price.festival),
   };
 }
 
@@ -75,6 +87,17 @@ async function ensureStagePrices(): Promise<void> {
   await sql.query("update ticket_stages set sell_festival = true where sell_festival is null");
   for (const col of ["sell_vvip", "sell_vip", "sell_festival"]) {
     await sql.query(`alter table ticket_stages alter column ${col} set default true`);
+    await sql.query(`alter table ticket_stages alter column ${col} set not null`);
+  }
+  await sql.query("alter table orders add column if not exists fast_track boolean not null default false");
+  await sql.query("alter table ticket_stages add column if not exists ft_price_vvip int");
+  await sql.query("alter table ticket_stages add column if not exists ft_price_vip int");
+  await sql.query("alter table ticket_stages add column if not exists ft_price_festival int");
+  await sql.query("update ticket_stages set ft_price_vvip = price_vvip where ft_price_vvip is null");
+  await sql.query("update ticket_stages set ft_price_vip = price_vip where ft_price_vip is null");
+  await sql.query("update ticket_stages set ft_price_festival = price_festival where ft_price_festival is null");
+  for (const col of ["ft_price_vvip", "ft_price_vip", "ft_price_festival"]) {
+    await sql.query(`alter table ticket_stages alter column ${col} set default 0`);
     await sql.query(`alter table ticket_stages alter column ${col} set not null`);
   }
   schemaReady = true;
@@ -126,6 +149,7 @@ function toStage(row: StageRow, sold: StageQuota): TicketStage {
     quota: quotaFrom(row),
     sold,
     price: priceFrom(row),
+    fastTrackPrice: fastTrackPriceFrom(row),
     onSale,
     allowed,
     live: status === "live",
@@ -227,6 +251,38 @@ export async function updateStage(input: {
         sell_vvip = ${input.onSale.vvip},
         sell_vip = ${input.onSale.vip},
         sell_festival = ${input.onSale.festival}
+    where id = ${input.id}
+    returning *
+  `;
+  const row = updated[0];
+  if (!row) throw new Error("Tahap tidak ditemukan");
+  return toStage(row, await soldByStage(row.id));
+}
+
+export async function updateFastTrackPrices(input: {
+  id: StageId;
+  fastTrackPrice: StageQuota;
+}): Promise<TicketStage> {
+  await ensureStagePrices();
+  const def = stageDef(input.id);
+  if (!def) throw new Error("Tahap tidak ditemukan");
+  const price = { ...input.fastTrackPrice };
+  const sql = await getSql();
+  const current = await sql<StageRow>`select * from ticket_stages where id = ${input.id} limit 1`;
+  const rowNow = current[0];
+  if (!rowNow) throw new Error("Tahap tidak ditemukan");
+  const onSale = salesFrom(rowNow);
+  for (const type of ["vvip", "vip", "festival"] as const) {
+    price[type] = Math.max(0, Math.floor(Number(price[type]) || 0));
+    if (onSale[type] && price[type] < 1) {
+      throw new Error(`Harga Fast Track ${TICKET_LABEL[type]} wajib diisi`);
+    }
+  }
+  const updated = await sql<StageRow>`
+    update ticket_stages
+    set ft_price_vvip = ${price.vvip},
+        ft_price_vip = ${price.vip},
+        ft_price_festival = ${price.festival}
     where id = ${input.id}
     returning *
   `;

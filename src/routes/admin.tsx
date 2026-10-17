@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, LogOut, ScanLine, Ticket, TicketCheck, Users, Share2 } from "lucide-react";
+import { LayoutDashboard, LogOut, ScanLine, Ticket, TicketCheck, Users, Share2, Zap, BadgeDollarSign } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getStaffSession, staffLogout } from "@/lib/fn/staff";
 import type { StaffRole } from "@/lib/event";
@@ -46,7 +46,7 @@ function AdminLayout() {
   }
 
   const links: {
-    to: "/admin" | "/admin/konfirmasi" | "/admin/tiketing" | "/admin/pengguna" | "/admin/agen" | "/admin/tiketbox";
+    to: "/admin" | "/admin/konfirmasi" | "/admin/tiketing" | "/admin/harga-fast-track" | "/admin/fast-track" | "/admin/pengguna" | "/admin/agen" | "/admin/tiketbox";
     label: string;
     icon: typeof LayoutDashboard;
     exact: boolean;
@@ -57,6 +57,8 @@ function AdminLayout() {
   }
   if (staff.role === "admin") {
     links.push({ to: "/admin/tiketing", label: "Tiketing", icon: Ticket, exact: false });
+    links.push({ to: "/admin/harga-fast-track", label: "Harga Fast Track", icon: BadgeDollarSign, exact: false });
+    links.push({ to: "/admin/fast-track", label: "Fast Track", icon: Zap, exact: false });
     links.push({ to: "/admin/pengguna", label: "Pengguna", icon: Users, exact: false });
   }
   if (staff.role !== "tiketbox") {

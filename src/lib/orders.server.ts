@@ -107,6 +107,7 @@ async function ensureIdentitySchema(): Promise<void> {
   await sql.query("alter table orders add column if not exists whatsapp_norm text");
   await sql.query("alter table orders add column if not exists cancelled_at timestamptz");
   await sql.query("alter table orders add column if not exists cancelled_by text");
+  await sql.query("alter table orders add column if not exists fast_track boolean not null default false");
   try {
     await sql.query(`
       do $c$
@@ -146,10 +147,10 @@ async function ensureIdentitySchema(): Promise<void> {
     await sql.query("drop index if exists orders_email_lower_uidx");
     await sql.query("drop index if exists orders_whatsapp_norm_uidx");
     await sql.query(
-      "create unique index if not exists orders_email_lower_uidx on orders (lower(email)) where status <> 'cancelled'",
+      "create unique index if not exists orders_email_lower_uidx on orders (lower(email)) where status <> 'cancelled' and fast_track = false",
     );
     await sql.query(
-      "create unique index if not exists orders_whatsapp_norm_uidx on orders (whatsapp_norm) where status <> 'cancelled' and whatsapp_norm is not null",
+      "create unique index if not exists orders_whatsapp_norm_uidx on orders (whatsapp_norm) where status <> 'cancelled' and fast_track = false and whatsapp_norm is not null",
     );
   } catch {
     /* unique already partial */
@@ -167,6 +168,7 @@ export async function expireUnpaidOrders(): Promise<number> {
           cancelled_at = now(),
           cancelled_by = ${"system"}
       where status = ${"awaiting_payment"}
+        and fast_track = false
         and (proof_data is null or proof_data = '')
         and created_at < now() - interval '1 minute' * ${AUTO_CANCEL_MINUTES}
       returning id
@@ -181,13 +183,13 @@ async function assertFreshIdentity(email: string, waNorm: string): Promise<void>
   await ensureIdentitySchema();
   const sql = await getSql();
   const byEmail = await sql<{ id: number }>`
-    select id from orders where lower(email) = ${email} and status <> ${"cancelled"} limit 1
+    select id from orders where lower(email) = ${email} and status <> ${"cancelled"} and fast_track = false limit 1
   `;
   if (byEmail[0]) {
     throw new Error("Email ini sudah digunakan untuk pembelian tiket");
   }
   const byWa = await sql<{ id: number }>`
-    select id from orders where whatsapp_norm = ${waNorm} and status <> ${"cancelled"} limit 1
+    select id from orders where whatsapp_norm = ${waNorm} and status <> ${"cancelled"} and fast_track = false limit 1
   `;
   if (byWa[0]) {
     throw new Error("Nomor WhatsApp ini sudah digunakan untuk pembelian tiket");
@@ -203,6 +205,7 @@ export async function createOrder(input: {
   qtyVvip: number;
   qtyVip: number;
   qtyFestival: number;
+  fastTrack?: boolean;
 }): Promise<PublicOrder> {
   await expireUnpaidOrders();
   await ensureAdminSeeded();
@@ -226,35 +229,48 @@ export async function createOrder(input: {
   const totalQty = qty.vvip + qty.vip + qty.festival;
   if (totalQty < 1) throw new Error("Pilih minimal satu tiket");
 
-  await assertFreshIdentity(email, waNorm);
+  const fastTrack = Boolean(input.fastTrack);
+  if (!fastTrack) await assertFreshIdentity(email, waNorm);
 
   const stage = await getLiveStage();
-  if (!stage) throw new Error("Penjualan tiket sedang ditutup");
+  if (!stage) throw new Error(fastTrack ? "Tidak ada tahap penjualan yang sedang berlangsung" : "Penjualan tiket sedang ditutup");
 
-  if (isSingleTicketStage(stage.id)) {
-    const kinds = (["vvip", "vip", "festival"] as const).filter((type) => qty[type] > 0);
-    if (kinds.length > 1 || totalQty > 1) {
-      throw new Error("Early Bird hanya boleh membeli 1 tiket, 1 jenis");
+  if (fastTrack) {
+    for (const type of ["vvip", "vip", "festival"] as const) {
+      if (qty[type] < 1) continue;
+      if (!stage.allowed.includes(type)) {
+        throw new Error(`${TICKET_LABEL[type]} sedang tidak aktif`);
+      }
+      if (stage.fastTrackPrice[type] < 1) {
+        throw new Error(`Harga Fast Track ${TICKET_LABEL[type]} belum diatur`);
+      }
     }
-  } else if (totalQty > MAX_TOTAL_TICKETS) {
-    throw new Error(`Maksimal ${MAX_TOTAL_TICKETS} tiket per pembelian, bisa campur jenis`);
-  }
-  for (const type of ["vvip", "vip", "festival"] as const) {
-    if (qty[type] < 1) continue;
-    if (!stage.allowed.includes(type)) {
-      throw new Error(`${TICKET_LABEL[type]} tidak dijual pada tahap ${stage.label}`);
+  } else {
+    if (isSingleTicketStage(stage.id)) {
+      const kinds = (["vvip", "vip", "festival"] as const).filter((type) => qty[type] > 0);
+      if (kinds.length > 1 || totalQty > 1) {
+        throw new Error("Early Bird hanya boleh membeli 1 tiket, 1 jenis");
+      }
+    } else if (totalQty > MAX_TOTAL_TICKETS) {
+      throw new Error(`Maksimal ${MAX_TOTAL_TICKETS} tiket per pembelian, bisa campur jenis`);
     }
-    const sisa = remainingOf(stage.quota[type], stage.sold[type]);
-    if (qty[type] > sisa) {
-      throw new Error(
-        sisa < 1
-          ? `Kuota ${TICKET_LABEL[type]} ${stage.label} habis`
-          : `Sisa kuota ${TICKET_LABEL[type]} tahap ${stage.label}: ${sisa}`,
-      );
-    }
-    const maxPer = maxPerTypeForStage(stage.id);
-    if (qty[type] > maxPer) {
-      throw new Error(`Maksimal ${maxPer} tiket ${TICKET_LABEL[type]} pada tahap ${stage.label}`);
+    for (const type of ["vvip", "vip", "festival"] as const) {
+      if (qty[type] < 1) continue;
+      if (!stage.allowed.includes(type)) {
+        throw new Error(`${TICKET_LABEL[type]} tidak dijual pada tahap ${stage.label}`);
+      }
+      const sisa = remainingOf(stage.quota[type], stage.sold[type]);
+      if (qty[type] > sisa) {
+        throw new Error(
+          sisa < 1
+            ? `Kuota ${TICKET_LABEL[type]} ${stage.label} habis`
+            : `Sisa kuota ${TICKET_LABEL[type]} tahap ${stage.label}: ${sisa}`,
+        );
+      }
+      const maxPer = maxPerTypeForStage(stage.id);
+      if (qty[type] > maxPer) {
+        throw new Error(`Maksimal ${maxPer} tiket ${TICKET_LABEL[type]} pada tahap ${stage.label}`);
+      }
     }
   }
 
@@ -266,10 +282,8 @@ export async function createOrder(input: {
     referral = agent.referralCode;
   }
 
-  const baseAmount =
-    qty.vvip * stage.price.vvip +
-    qty.vip * stage.price.vip +
-    qty.festival * stage.price.festival;
+  const unit = fastTrack ? stage.fastTrackPrice : stage.price;
+  const baseAmount = qty.vvip * unit.vvip + qty.vip * unit.vip + qty.festival * unit.festival;
   const uniqueCode = uniqueCodeFromWhatsapp(whatsapp);
   const totalAmount = baseAmount + uniqueCode;
   const publicId = randomBytes(9).toString("base64url");
@@ -280,11 +294,11 @@ export async function createOrder(input: {
     inserted = await sql<OrderRow>`
     insert into orders (
       public_id, email, full_name, address, whatsapp, referral_code,
-      qty_vvip, qty_vip, qty_festival, base_amount, unique_code, total_amount, status, stage_id, whatsapp_norm
+      qty_vvip, qty_vip, qty_festival, base_amount, unique_code, total_amount, status, stage_id, whatsapp_norm, fast_track
     ) values (
       ${publicId}, ${email}, ${fullName}, ${address}, ${whatsapp}, ${referral},
       ${qty.vvip}, ${qty.vip}, ${qty.festival}, ${baseAmount}, ${uniqueCode}, ${totalAmount},
-      ${"awaiting_payment"}, ${stage.id}, ${waNorm}
+      ${"awaiting_payment"}, ${stage.id}, ${waNorm}, ${fastTrack}
     )
     returning *
   `;

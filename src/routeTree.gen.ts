@@ -15,6 +15,8 @@ import { Route as BeliRouteImport } from './routes/beli'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAgenRouteImport } from './routes/admin/agen'
+import { Route as AdminFastTrackRouteImport } from './routes/admin/fast-track'
+import { Route as AdminHargaFastTrackRouteImport } from './routes/admin/harga-fast-track'
 import { Route as AdminKonfirmasiRouteImport } from './routes/admin/konfirmasi'
 import { Route as AdminPenggunaRouteImport } from './routes/admin/pengguna'
 import { Route as AdminTiketboxRouteImport } from './routes/admin/tiketbox'
@@ -51,6 +53,16 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AdminAgenRoute = AdminAgenRouteImport.update({
   id: '/agen',
   path: '/agen',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFastTrackRoute = AdminFastTrackRouteImport.update({
+  id: '/fast-track',
+  path: '/fast-track',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminHargaFastTrackRoute = AdminHargaFastTrackRouteImport.update({
+  id: '/harga-fast-track',
+  path: '/harga-fast-track',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminKonfirmasiRoute = AdminKonfirmasiRouteImport.update({
@@ -95,6 +107,8 @@ export interface FileRoutesByFullPath {
   '/beli': typeof BeliRoute
   '/login': typeof LoginRoute
   '/admin/agen': typeof AdminAgenRoute
+  '/admin/fast-track': typeof AdminFastTrackRoute
+  '/admin/harga-fast-track': typeof AdminHargaFastTrackRoute
   '/admin/konfirmasi': typeof AdminKonfirmasiRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
   '/admin/tiketbox': typeof AdminTiketboxRoute
@@ -109,6 +123,8 @@ export interface FileRoutesByTo {
   '/beli': typeof BeliRoute
   '/login': typeof LoginRoute
   '/admin/agen': typeof AdminAgenRoute
+  '/admin/fast-track': typeof AdminFastTrackRoute
+  '/admin/harga-fast-track': typeof AdminHargaFastTrackRoute
   '/admin/konfirmasi': typeof AdminKonfirmasiRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
   '/admin/tiketbox': typeof AdminTiketboxRoute
@@ -125,6 +141,8 @@ export interface FileRoutesById {
   '/beli': typeof BeliRoute
   '/login': typeof LoginRoute
   '/admin/agen': typeof AdminAgenRoute
+  '/admin/fast-track': typeof AdminFastTrackRoute
+  '/admin/harga-fast-track': typeof AdminHargaFastTrackRoute
   '/admin/konfirmasi': typeof AdminKonfirmasiRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
   '/admin/tiketbox': typeof AdminTiketboxRoute
@@ -142,6 +160,8 @@ export interface FileRouteTypes {
     | '/beli'
     | '/login'
     | '/admin/agen'
+    | '/admin/fast-track'
+    | '/admin/harga-fast-track'
     | '/admin/konfirmasi'
     | '/admin/pengguna'
     | '/admin/tiketbox'
@@ -156,6 +176,8 @@ export interface FileRouteTypes {
     | '/beli'
     | '/login'
     | '/admin/agen'
+    | '/admin/fast-track'
+    | '/admin/harga-fast-track'
     | '/admin/konfirmasi'
     | '/admin/pengguna'
     | '/admin/tiketbox'
@@ -171,6 +193,8 @@ export interface FileRouteTypes {
     | '/beli'
     | '/login'
     | '/admin/agen'
+    | '/admin/fast-track'
+    | '/admin/harga-fast-track'
     | '/admin/konfirmasi'
     | '/admin/pengguna'
     | '/admin/tiketbox'
@@ -235,6 +259,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAgenRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/fast-track': {
+      id: '/admin/fast-track'
+      path: '/fast-track'
+      fullPath: '/admin/fast-track'
+      preLoaderRoute: typeof AdminFastTrackRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/harga-fast-track': {
+      id: '/admin/harga-fast-track'
+      path: '/harga-fast-track'
+      fullPath: '/admin/harga-fast-track'
+      preLoaderRoute: typeof AdminHargaFastTrackRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/konfirmasi': {
       id: '/admin/konfirmasi'
       path: '/konfirmasi'
@@ -289,6 +327,8 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminAgenRoute: typeof AdminAgenRoute
+  AdminFastTrackRoute: typeof AdminFastTrackRoute
+  AdminHargaFastTrackRoute: typeof AdminHargaFastTrackRoute
   AdminKonfirmasiRoute: typeof AdminKonfirmasiRoute
   AdminPenggunaRoute: typeof AdminPenggunaRoute
   AdminTiketboxRoute: typeof AdminTiketboxRoute
@@ -298,6 +338,8 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAgenRoute: AdminAgenRoute,
+  AdminFastTrackRoute: AdminFastTrackRoute,
+  AdminHargaFastTrackRoute: AdminHargaFastTrackRoute,
   AdminKonfirmasiRoute: AdminKonfirmasiRoute,
   AdminPenggunaRoute: AdminPenggunaRoute,
   AdminTiketboxRoute: AdminTiketboxRoute,

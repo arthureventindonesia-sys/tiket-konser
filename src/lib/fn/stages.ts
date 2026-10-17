@@ -29,3 +29,12 @@ export const saveStage = createServerFn({ method: "POST" })
     await requireStaff(["admin"]);
     return updateStage(data);
   });
+
+export const saveFastTrackPrices = createServerFn({ method: "POST" })
+  .validator((data: { id: StageId; fastTrackPrice: StageQuota }) => data)
+  .handler(async ({ data }) => {
+    const { requireStaff } = await import("@/lib/staff.server");
+    const { updateFastTrackPrices } = await import("@/lib/stages.server");
+    await requireStaff(["admin"]);
+    return updateFastTrackPrices(data);
+  });
