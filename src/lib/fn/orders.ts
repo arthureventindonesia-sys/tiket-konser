@@ -16,6 +16,24 @@ export const placeOrder = createServerFn({ method: "POST" })
     return createOrder(data);
   });
 
+export const placeStudentOrder = createServerFn({ method: "POST" })
+  .validator((data: {
+    email: string;
+    fullName: string;
+    address: string;
+    whatsapp: string;
+    referralCode?: string;
+    qtyVvip: number;
+    qtyVip: number;
+    qtyFestival: number;
+    studentCardDataUrl: string;
+    studentCardMime: string;
+  }) => data)
+  .handler(async ({ data }) => {
+    const { createOrder } = await import("@/lib/orders.server");
+    return createOrder({ ...data, student: true });
+  });
+
 export const fetchOrder = createServerFn({ method: "POST" })
   .validator((publicId: string) => publicId)
   .handler(async ({ data }) => {

@@ -1,5 +1,5 @@
 import { getSql } from "@/lib/db";
-import { TICKET_LABEL, TICKET_PRICE, type TicketTypeId } from "@/lib/event";
+import { TICKET_LABEL, TICKET_PRICE, MAX_TOTAL_TICKETS, type TicketTypeId } from "@/lib/event";
 import {
   remainingOf,
   stageDef,
@@ -28,6 +28,9 @@ type StageRow = {
   ft_price_vvip?: number | null;
   ft_price_vip?: number | null;
   ft_price_festival?: number | null;
+  st_price_vvip?: number | null;
+  st_price_vip?: number | null;
+  st_price_festival?: number | null;
   sell_vvip?: boolean | null;
   sell_vip?: boolean | null;
   sell_festival?: boolean | null;
@@ -50,6 +53,15 @@ function priceFrom(row: StageRow): StageQuota {
     vvip: Number(row.price_vvip ?? TICKET_PRICE.vvip),
     vip: Number(row.price_vip ?? TICKET_PRICE.vip),
     festival: Number(row.price_festival ?? TICKET_PRICE.festival),
+  };
+}
+
+function studentPriceFrom(row: StageRow): StageQuota {
+  const price = priceFrom(row);
+  return {
+    vvip: Number(row.st_price_vvip ?? price.vvip),
+    vip: Number(row.st_price_vip ?? price.vip),
+    festival: Number(row.st_price_festival ?? price.festival),
   };
 }
 
@@ -100,6 +112,19 @@ async function ensureStagePrices(): Promise<void> {
     await sql.query(`alter table ticket_stages alter column ${col} set default 0`);
     await sql.query(`alter table ticket_stages alter column ${col} set not null`);
   }
+  await sql.query("alter table ticket_stages add column if not exists st_price_vvip int");
+  await sql.query("alter table ticket_stages add column if not exists st_price_vip int");
+  await sql.query("alter table ticket_stages add column if not exists st_price_festival int");
+  await sql.query("update ticket_stages set st_price_vvip = price_vvip where st_price_vvip is null");
+  await sql.query("update ticket_stages set st_price_vip = price_vip where st_price_vip is null");
+  await sql.query("update ticket_stages set st_price_festival = price_festival where st_price_festival is null");
+  for (const col of ["st_price_vvip", "st_price_vip", "st_price_festival"]) {
+    await sql.query(`alter table ticket_stages alter column ${col} set default 0`);
+    await sql.query(`alter table ticket_stages alter column ${col} set not null`);
+  }
+  await sql.query("alter table orders add column if not exists student boolean not null default false");
+  await sql.query("alter table orders add column if not exists student_card text");
+  await sql.query("alter table orders add column if not exists student_card_mime text");
   schemaReady = true;
 }
 
@@ -150,6 +175,7 @@ function toStage(row: StageRow, sold: StageQuota): TicketStage {
     sold,
     price: priceFrom(row),
     fastTrackPrice: fastTrackPriceFrom(row),
+    studentPrice: studentPriceFrom(row),
     onSale,
     allowed,
     live: status === "live",
@@ -173,7 +199,7 @@ export async function getLiveStage(): Promise<TicketStage | null> {
   return stages.find((s) => s.live) ?? null;
 }
 
-export async function getSaleOffer(): Promise<SaleOffer> {
+export async function getSaleOffer(kind: "public" | "student" = "public"): Promise<SaleOffer> {
   const { expireUnpaidOrders } = await import("@/lib/orders.server");
   await expireUnpaidOrders();
   const stage = await getLiveStage();
@@ -191,7 +217,7 @@ export async function getSaleOffer(): Promise<SaleOffer> {
       remaining: emptyQuota(),
       price: emptyQuota(),
       allowed: [],
-      maxPerType: maxPerTypeForStage(next?.id),
+      maxPerType: kind === "student" ? MAX_TOTAL_TICKETS : maxPerTypeForStage(next?.id),
     };
   }
   const remaining = emptyQuota();
@@ -203,9 +229,9 @@ export async function getSaleOffer(): Promise<SaleOffer> {
     message: `Tahap ${stage.label}`,
     stage: { id: stage.id, label: stage.label, startsAt: stage.startsAt, endsAt: stage.endsAt },
     remaining,
-    price: stage.price,
+    price: kind === "student" ? stage.studentPrice : stage.price,
     allowed: stage.allowed,
-    maxPerType: maxPerTypeForStage(stage.id),
+    maxPerType: kind === "student" ? MAX_TOTAL_TICKETS : maxPerTypeForStage(stage.id),
   };
 }
 
@@ -289,4 +315,36 @@ export async function updateFastTrackPrices(input: {
   const row = updated[0];
   if (!row) throw new Error("Tahap tidak ditemukan");
   return toStage(row, await soldByStage(row.id));
+}
+
+export async function updateStudentPrices(input: {
+  id: StageId;
+  studentPrice: StageQuota;
+}): Promise<TicketStage> {
+  await ensureStagePrices();
+  const def = stageDef(input.id);
+  if (!def) throw new Error("Tahap tidak ditemukan");
+  const price = { ...input.studentPrice };
+  const sql = await getSql();
+  const current = await sql<StageRow>`select * from ticket_stages where id = ${input.id} limit 1`;
+  const rowNow = current[0];
+  if (!rowNow) throw new Error("Tahap tidak ditemukan");
+  const onSale = salesFrom(rowNow);
+  for (const type of ["vvip", "vip", "festival"] as const) {
+    price[type] = Math.max(0, Math.floor(Number(price[type]) || 0));
+    if (onSale[type] && price[type] < 1) {
+      throw new Error(`Harga pelajar ${TICKET_LABEL[type]} wajib diisi`);
+    }
+  }
+  const updated = await sql<StageRow>`
+    update ticket_stages
+    set st_price_vvip = ${price.vvip},
+        st_price_vip = ${price.vip},
+        st_price_festival = ${price.festival}
+    where id = ${input.id}
+    returning *
+  `;
+  const saved = updated[0];
+  if (!saved) throw new Error("Tahap tidak ditemukan");
+  return toStage(saved, await soldByStage(saved.id));
 }

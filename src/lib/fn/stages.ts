@@ -6,6 +6,11 @@ export const fetchSaleOffer = createServerFn({ method: "GET" }).handler(async ()
   return getSaleOffer();
 });
 
+export const fetchStudentOffer = createServerFn({ method: "GET" }).handler(async () => {
+  const { getSaleOffer } = await import("@/lib/stages.server");
+  return getSaleOffer("student");
+});
+
 export const fetchFastTrackContext = createServerFn({ method: "GET" }).handler(async () => {
   const { requireStaff, listStaff } = await import("@/lib/staff.server");
   const { getLiveStage } = await import("@/lib/stages.server");
@@ -59,4 +64,13 @@ export const saveFastTrackPrices = createServerFn({ method: "POST" })
     const { updateFastTrackPrices } = await import("@/lib/stages.server");
     await requireStaff(["admin"]);
     return updateFastTrackPrices(data);
+  });
+
+export const saveStudentPrices = createServerFn({ method: "POST" })
+  .validator((data: { id: StageId; studentPrice: StageQuota }) => data)
+  .handler(async ({ data }) => {
+    const { requireStaff } = await import("@/lib/staff.server");
+    const { updateStudentPrices } = await import("@/lib/stages.server");
+    await requireStaff(["admin"]);
+    return updateStudentPrices(data);
   });

@@ -39,6 +39,15 @@ export const fetchOrderProof = createServerFn({ method: "POST" })
     return getOrderProof(data);
   });
 
+export const fetchStudentCard = createServerFn({ method: "POST" })
+  .validator((orderId: number) => orderId)
+  .handler(async ({ data }) => {
+    const { requireStaff } = await import("@/lib/staff.server");
+    const { getStudentCard } = await import("@/lib/orders.server");
+    await requireStaff(["admin", "crew"]);
+    return getStudentCard(data);
+  });
+
 export const placeFastTrack = createServerFn({ method: "POST" })
   .validator((data: {
     email: string;

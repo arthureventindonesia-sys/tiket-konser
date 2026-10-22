@@ -25,6 +25,7 @@ export type TicketStage = {
   sold: StageQuota;
   price: StageQuota;
   fastTrackPrice: StageQuota;
+  studentPrice: StageQuota;
   onSale: StageSales;
   allowed: TicketTypeId[];
   live: boolean;

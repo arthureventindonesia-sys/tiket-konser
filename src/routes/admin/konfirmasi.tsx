@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { copyText } from "@/lib/agent-qr";
 import { TICKET_LABEL, TICKET_TYPES, type TicketTypeId } from "@/lib/event";
 import { formatDateTime, formatRupiah, waMeUrl } from "@/lib/format";
-import { cancelPayment, confirmPayment, fetchConfirmations, fetchOrderProof } from "@/lib/fn/admin";
+import { cancelPayment, confirmPayment, fetchConfirmations, fetchOrderProof, fetchStudentCard } from "@/lib/fn/admin";
 import type { AdminOrder } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -55,7 +55,8 @@ function KonfirmasiPage() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [pendingCancel, setPendingCancel] = useState<number | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ src: string; alt: string } | null>(null);
+  const [cards, setCards] = useState<Record<number, string>>({});
   const [filter, setFilter] = useState<ConfirmFilter>("pending");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [query, setQuery] = useState("");
@@ -106,7 +107,7 @@ function KonfirmasiPage() {
 
   async function openProof(order: AdminOrder) {
     if (order.proofData) {
-      setPreview(order.proofData);
+      setPreview({ src: order.proofData, alt: "Bukti transfer" });
       return;
     }
     setBusyId(order.id);
@@ -117,9 +118,31 @@ function KonfirmasiPage() {
         return;
       }
       setOrders((prev) => prev.map((item) => (item.id === order.id ? { ...item, proofData: data } : item)));
-      setPreview(data);
+      setPreview({ src: data, alt: "Bukti transfer" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Gagal membuka bukti");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function openCard(order: AdminOrder) {
+    const cached = cards[order.id];
+    if (cached) {
+      setPreview({ src: cached, alt: "Kartu pelajar" });
+      return;
+    }
+    setBusyId(order.id);
+    try {
+      const data = await fetchStudentCard({ data: order.id });
+      if (!data) {
+        toast.error("Kartu pelajar tidak ditemukan");
+        return;
+      }
+      setCards((prev) => ({ ...prev, [order.id]: data }));
+      setPreview({ src: data, alt: "Kartu pelajar" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal membuka kartu pelajar");
     } finally {
       setBusyId(null);
     }
@@ -290,7 +313,10 @@ function KonfirmasiPage() {
                 <li key={o.id} className="rounded-xl border border-border bg-surface p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-medium">{o.fullName}</p>
+                      <p className="font-medium">
+                        {o.fullName}
+                        {o.student ? <span className="ml-2 text-xs uppercase tracking-[0.14em] text-gold">Pelajar</span> : null}
+                      </p>
                       <p className="text-sm text-subtle">{o.email} · {o.whatsapp}</p>
                       <p className="mt-1 text-sm text-muted">{ticketSummary(o)}</p>
                       <p className="font-mono text-sm tabular-nums text-gold">
@@ -302,20 +328,32 @@ function KonfirmasiPage() {
                       {cancelled ? "Dibatalkan" : confirmed ? "Terkonfirmasi" : o.hasProof ? "Menunggu" : "Belum unggah"}
                     </Badge>
                   </div>
-                  {o.hasProof ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-3"
-                      onClick={() => void openProof(o)}
-                      disabled={busyId === o.id}
-                    >
-                      {busyId === o.id ? "Membuka bukti…" : "Lihat bukti transfer"}
-                    </Button>
-                  ) : (
-                    <p className="mt-3 text-sm text-subtle">Bukti transfer belum diunggah.</p>
-                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {o.hasProof ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void openProof(o)}
+                        disabled={busyId === o.id}
+                      >
+                        {busyId === o.id ? "Membuka bukti…" : "Lihat bukti transfer"}
+                      </Button>
+                    ) : (
+                      <p className="text-sm text-subtle">Bukti transfer belum diunggah.</p>
+                    )}
+                    {o.student ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void openCard(o)}
+                        disabled={busyId === o.id}
+                      >
+                        Lihat kartu pelajar
+                      </Button>
+                    ) : null}
+                  </div>
                   {confirmed && o.tickets.length > 0 ? (
                     <p className="mt-3 font-mono text-xs text-muted">
                       {o.tickets.map((t) => t.code).join(" · ")}
@@ -420,8 +458,8 @@ function KonfirmasiPage() {
           role="presentation"
         >
           <img
-            src={preview}
-            alt="Bukti transfer"
+            src={preview.src}
+            alt={preview.alt}
             className="max-h-full max-w-full object-contain"
             style={{
               width: "auto",

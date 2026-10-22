@@ -42,6 +42,9 @@ type OrderRow = {
   taken_by?: string | null;
   cancelled_at?: string | null;
   cancelled_by?: string | null;
+  student?: boolean | null;
+  student_card?: string | null;
+  student_card_mime?: string | null;
 };
 
 function qtyOf(row: Pick<OrderRow, "qty_vvip" | "qty_vip" | "qty_festival">, type: TicketTypeId) {
@@ -83,6 +86,7 @@ async function toPublic(
     totalAmount: Number(row.total_amount),
     status: row.status,
     hasProof: Boolean(row.proof_data),
+    student: Boolean(row.student),
     createdAt: row.created_at,
     confirmedAt: row.confirmed_at,
     tickets,
@@ -108,6 +112,9 @@ async function ensureIdentitySchema(): Promise<void> {
   await sql.query("alter table orders add column if not exists cancelled_at timestamptz");
   await sql.query("alter table orders add column if not exists cancelled_by text");
   await sql.query("alter table orders add column if not exists fast_track boolean not null default false");
+  await sql.query("alter table orders add column if not exists student boolean not null default false");
+  await sql.query("alter table orders add column if not exists student_card text");
+  await sql.query("alter table orders add column if not exists student_card_mime text");
   try {
     await sql.query(`
       do $c$
@@ -196,6 +203,16 @@ async function assertFreshIdentity(email: string, waNorm: string): Promise<void>
   }
 }
 
+function assertStudentCard(dataUrl: string | undefined, mime: string | undefined) {
+  if (!dataUrl?.startsWith("data:image/")) throw new Error("Kartu pelajar wajib diunggah");
+  const comma = dataUrl.indexOf(",");
+  const b64 = comma >= 0 ? dataUrl.slice(comma + 1) : "";
+  const bytes = Math.floor((b64.length * 3) / 4);
+  if (bytes > MAX_PROOF_BYTES) throw new Error("Kartu pelajar maksimal 1 MB");
+  const allowed = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+  if (!mime || !allowed.includes(mime)) throw new Error("Kartu pelajar: JPG, PNG, atau WEBP");
+}
+
 export async function createOrder(input: {
   email: string;
   fullName: string;
@@ -206,6 +223,9 @@ export async function createOrder(input: {
   qtyVip: number;
   qtyFestival: number;
   fastTrack?: boolean;
+  student?: boolean;
+  studentCardDataUrl?: string;
+  studentCardMime?: string;
 }): Promise<PublicOrder> {
   await expireUnpaidOrders();
   await ensureAdminSeeded();
@@ -230,12 +250,36 @@ export async function createOrder(input: {
   if (totalQty < 1) throw new Error("Pilih minimal satu tiket");
 
   const fastTrack = Boolean(input.fastTrack);
+  const student = Boolean(input.student);
+  if (student && fastTrack) throw new Error("Pesanan tidak valid");
   if (!fastTrack) await assertFreshIdentity(email, waNorm);
 
   const stage = await getLiveStage();
   if (!stage) throw new Error(fastTrack ? "Tidak ada tahap penjualan yang sedang berlangsung" : "Penjualan tiket sedang ditutup");
 
-  if (fastTrack) {
+  if (student) {
+    assertStudentCard(input.studentCardDataUrl, input.studentCardMime);
+    if (totalQty > MAX_TOTAL_TICKETS) {
+      throw new Error(`Maksimal ${MAX_TOTAL_TICKETS} tiket per pembelian, bisa campur jenis`);
+    }
+    for (const type of ["vvip", "vip", "festival"] as const) {
+      if (qty[type] < 1) continue;
+      if (!stage.allowed.includes(type)) {
+        throw new Error(`${TICKET_LABEL[type]} tidak dijual pada tahap ${stage.label}`);
+      }
+      if (stage.studentPrice[type] < 1) {
+        throw new Error(`Harga pelajar ${TICKET_LABEL[type]} belum diatur`);
+      }
+      const sisa = remainingOf(stage.quota[type], stage.sold[type]);
+      if (qty[type] > sisa) {
+        throw new Error(
+          sisa < 1
+            ? `Kuota ${TICKET_LABEL[type]} ${stage.label} habis`
+            : `Sisa kuota ${TICKET_LABEL[type]} tahap ${stage.label}: ${sisa}`,
+        );
+      }
+    }
+  } else if (fastTrack) {
     for (const type of ["vvip", "vip", "festival"] as const) {
       if (qty[type] < 1) continue;
       if (!stage.allowed.includes(type)) {
@@ -282,7 +326,7 @@ export async function createOrder(input: {
     referral = agent.referralCode;
   }
 
-  const unit = fastTrack ? stage.fastTrackPrice : stage.price;
+  const unit = student ? stage.studentPrice : fastTrack ? stage.fastTrackPrice : stage.price;
   const baseAmount = qty.vvip * unit.vvip + qty.vip * unit.vip + qty.festival * unit.festival;
   const uniqueCode = uniqueCodeFromWhatsapp(whatsapp);
   const totalAmount = baseAmount + uniqueCode;
@@ -294,11 +338,13 @@ export async function createOrder(input: {
     inserted = await sql<OrderRow>`
     insert into orders (
       public_id, email, full_name, address, whatsapp, referral_code,
-      qty_vvip, qty_vip, qty_festival, base_amount, unique_code, total_amount, status, stage_id, whatsapp_norm, fast_track
+      qty_vvip, qty_vip, qty_festival, base_amount, unique_code, total_amount, status, stage_id, whatsapp_norm, fast_track, student, student_card, student_card_mime
     ) values (
       ${publicId}, ${email}, ${fullName}, ${address}, ${whatsapp}, ${referral},
       ${qty.vvip}, ${qty.vip}, ${qty.festival}, ${baseAmount}, ${uniqueCode}, ${totalAmount},
-      ${"awaiting_payment"}, ${stage.id}, ${waNorm}, ${fastTrack}
+      ${"awaiting_payment"}, ${stage.id}, ${waNorm}, ${fastTrack}, ${student},
+      ${student ? input.studentCardDataUrl ?? null : null},
+      ${student ? input.studentCardMime ?? null : null}
     )
     returning *
   `;
@@ -450,7 +496,7 @@ export async function listAdminOrders(): Promise<AdminOrder[]> {
     select
       id, public_id, email, full_name, address, whatsapp, referral_code,
       qty_vvip, qty_vip, qty_festival, base_amount, unique_code, total_amount,
-      status, proof_mime, proof_name, confirmed_at, created_at, stage_id,
+      status, proof_mime, proof_name, confirmed_at, created_at, stage_id, student,
       (proof_data is not null) as has_proof
     from orders
     order by
@@ -492,6 +538,14 @@ export async function getOrderProof(orderId: number): Promise<string | null> {
     select proof_data from orders where id = ${orderId} limit 1
   `;
   return rows[0]?.proof_data || null;
+}
+
+export async function getStudentCard(orderId: number): Promise<string | null> {
+  const sql = await getSql();
+  const rows = await sql<{ student_card: string | null }>`
+    select student_card from orders where id = ${orderId} limit 1
+  `;
+  return rows[0]?.student_card || null;
 }
 
 export async function listAgentOrders(referralCode: string): Promise<PublicOrder[]> {

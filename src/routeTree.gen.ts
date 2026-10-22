@@ -13,10 +13,12 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as BeliRouteImport } from './routes/beli'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as StudentRouteImport } from './routes/student'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAgenRouteImport } from './routes/admin/agen'
 import { Route as AdminFastTrackRouteImport } from './routes/admin/fast-track'
 import { Route as AdminHargaFastTrackRouteImport } from './routes/admin/harga-fast-track'
+import { Route as AdminHargaPelajarRouteImport } from './routes/admin/harga-pelajar'
 import { Route as AdminKonfirmasiRouteImport } from './routes/admin/konfirmasi'
 import { Route as AdminPenggunaRouteImport } from './routes/admin/pengguna'
 import { Route as AdminTiketboxRouteImport } from './routes/admin/tiketbox'
@@ -45,6 +47,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudentRoute = StudentRouteImport.update({
+  id: '/student',
+  path: '/student',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -63,6 +70,11 @@ const AdminFastTrackRoute = AdminFastTrackRouteImport.update({
 const AdminHargaFastTrackRoute = AdminHargaFastTrackRouteImport.update({
   id: '/harga-fast-track',
   path: '/harga-fast-track',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminHargaPelajarRoute = AdminHargaPelajarRouteImport.update({
+  id: '/harga-pelajar',
+  path: '/harga-pelajar',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminKonfirmasiRoute = AdminKonfirmasiRouteImport.update({
@@ -106,9 +118,11 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/beli': typeof BeliRoute
   '/login': typeof LoginRoute
+  '/student': typeof StudentRoute
   '/admin/agen': typeof AdminAgenRoute
   '/admin/fast-track': typeof AdminFastTrackRoute
   '/admin/harga-fast-track': typeof AdminHargaFastTrackRoute
+  '/admin/harga-pelajar': typeof AdminHargaPelajarRoute
   '/admin/konfirmasi': typeof AdminKonfirmasiRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
   '/admin/tiketbox': typeof AdminTiketboxRoute
@@ -122,9 +136,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/beli': typeof BeliRoute
   '/login': typeof LoginRoute
+  '/student': typeof StudentRoute
   '/admin/agen': typeof AdminAgenRoute
   '/admin/fast-track': typeof AdminFastTrackRoute
   '/admin/harga-fast-track': typeof AdminHargaFastTrackRoute
+  '/admin/harga-pelajar': typeof AdminHargaPelajarRoute
   '/admin/konfirmasi': typeof AdminKonfirmasiRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
   '/admin/tiketbox': typeof AdminTiketboxRoute
@@ -140,9 +156,11 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/beli': typeof BeliRoute
   '/login': typeof LoginRoute
+  '/student': typeof StudentRoute
   '/admin/agen': typeof AdminAgenRoute
   '/admin/fast-track': typeof AdminFastTrackRoute
   '/admin/harga-fast-track': typeof AdminHargaFastTrackRoute
+  '/admin/harga-pelajar': typeof AdminHargaPelajarRoute
   '/admin/konfirmasi': typeof AdminKonfirmasiRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
   '/admin/tiketbox': typeof AdminTiketboxRoute
@@ -159,9 +177,11 @@ export interface FileRouteTypes {
     | '/admin'
     | '/beli'
     | '/login'
+    | '/student'
     | '/admin/agen'
     | '/admin/fast-track'
     | '/admin/harga-fast-track'
+    | '/admin/harga-pelajar'
     | '/admin/konfirmasi'
     | '/admin/pengguna'
     | '/admin/tiketbox'
@@ -175,9 +195,11 @@ export interface FileRouteTypes {
     | '/'
     | '/beli'
     | '/login'
+    | '/student'
     | '/admin/agen'
     | '/admin/fast-track'
     | '/admin/harga-fast-track'
+    | '/admin/harga-pelajar'
     | '/admin/konfirmasi'
     | '/admin/pengguna'
     | '/admin/tiketbox'
@@ -192,9 +214,11 @@ export interface FileRouteTypes {
     | '/admin'
     | '/beli'
     | '/login'
+    | '/student'
     | '/admin/agen'
     | '/admin/fast-track'
     | '/admin/harga-fast-track'
+    | '/admin/harga-pelajar'
     | '/admin/konfirmasi'
     | '/admin/pengguna'
     | '/admin/tiketbox'
@@ -210,6 +234,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   BeliRoute: typeof BeliRoute
   LoginRoute: typeof LoginRoute
+  StudentRoute: typeof StudentRoute
   BayarOrderIdRoute: typeof BayarOrderIdRoute
   TiketOrderIdRoute: typeof TiketOrderIdRoute
   UploadOrderIdRoute: typeof UploadOrderIdRoute
@@ -245,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/student': {
+      id: '/student'
+      path: '/student'
+      fullPath: '/student'
+      preLoaderRoute: typeof StudentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
@@ -271,6 +303,13 @@ declare module '@tanstack/react-router' {
       path: '/harga-fast-track'
       fullPath: '/admin/harga-fast-track'
       preLoaderRoute: typeof AdminHargaFastTrackRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/harga-pelajar': {
+      id: '/admin/harga-pelajar'
+      path: '/harga-pelajar'
+      fullPath: '/admin/harga-pelajar'
+      preLoaderRoute: typeof AdminHargaPelajarRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/konfirmasi': {
@@ -329,6 +368,7 @@ interface AdminRouteChildren {
   AdminAgenRoute: typeof AdminAgenRoute
   AdminFastTrackRoute: typeof AdminFastTrackRoute
   AdminHargaFastTrackRoute: typeof AdminHargaFastTrackRoute
+  AdminHargaPelajarRoute: typeof AdminHargaPelajarRoute
   AdminKonfirmasiRoute: typeof AdminKonfirmasiRoute
   AdminPenggunaRoute: typeof AdminPenggunaRoute
   AdminTiketboxRoute: typeof AdminTiketboxRoute
@@ -340,6 +380,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAgenRoute: AdminAgenRoute,
   AdminFastTrackRoute: AdminFastTrackRoute,
   AdminHargaFastTrackRoute: AdminHargaFastTrackRoute,
+  AdminHargaPelajarRoute: AdminHargaPelajarRoute,
   AdminKonfirmasiRoute: AdminKonfirmasiRoute,
   AdminPenggunaRoute: AdminPenggunaRoute,
   AdminTiketboxRoute: AdminTiketboxRoute,
@@ -354,6 +395,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   BeliRoute: BeliRoute,
   LoginRoute: LoginRoute,
+  StudentRoute: StudentRoute,
   BayarOrderIdRoute: BayarOrderIdRoute,
   TiketOrderIdRoute: TiketOrderIdRoute,
   UploadOrderIdRoute: UploadOrderIdRoute,

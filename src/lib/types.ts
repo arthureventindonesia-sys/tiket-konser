@@ -17,6 +17,7 @@ export type PublicOrder = {
   totalAmount: number;
   status: OrderStatus;
   hasProof: boolean;
+  student: boolean;
   createdAt: string;
   confirmedAt: string | null;
   tickets: TicketCode[];
