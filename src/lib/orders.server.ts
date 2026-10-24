@@ -10,7 +10,7 @@ import {
   type TicketTypeId,
 } from "@/lib/event";
 import { toWaNumber, uniqueCodeFromWhatsapp } from "@/lib/format";
-import { remainingOf, maxPerTypeForStage, isSingleTicketStage } from "@/lib/stages";
+import { remainingOf } from "@/lib/stages";
 import { getLiveStage } from "@/lib/stages.server";
 import { ensureAdminSeeded, ensureTiketboxSchema, findAgentByCode } from "@/lib/staff.server";
 import type { AdminOrder, DashboardData, PublicOrder, TicketboxRecord } from "@/lib/types";
@@ -290,13 +290,14 @@ export async function createOrder(input: {
       }
     }
   } else {
-    if (isSingleTicketStage(stage.id)) {
+    const limit = Math.max(1, Math.floor(stage.purchaseLimit) || 1);
+    if (limit <= 1) {
       const kinds = (["vvip", "vip", "festival"] as const).filter((type) => qty[type] > 0);
       if (kinds.length > 1 || totalQty > 1) {
-        throw new Error("Early Bird hanya boleh membeli 1 tiket, 1 jenis");
+        throw new Error(`${stage.label} hanya boleh membeli 1 tiket, 1 jenis`);
       }
-    } else if (totalQty > MAX_TOTAL_TICKETS) {
-      throw new Error(`Maksimal ${MAX_TOTAL_TICKETS} tiket per pembelian, bisa campur jenis`);
+    } else if (totalQty > limit) {
+      throw new Error(`Maksimal ${limit} tiket per pembelian, bisa campur jenis`);
     }
     for (const type of ["vvip", "vip", "festival"] as const) {
       if (qty[type] < 1) continue;
@@ -311,9 +312,8 @@ export async function createOrder(input: {
             : `Sisa kuota ${TICKET_LABEL[type]} tahap ${stage.label}: ${sisa}`,
         );
       }
-      const maxPer = maxPerTypeForStage(stage.id);
-      if (qty[type] > maxPer) {
-        throw new Error(`Maksimal ${maxPer} tiket ${TICKET_LABEL[type]} pada tahap ${stage.label}`);
+      if (qty[type] > limit) {
+        throw new Error(`Maksimal ${limit} tiket ${TICKET_LABEL[type]} pada tahap ${stage.label}`);
       }
     }
   }

@@ -46,8 +46,8 @@ function TiketingPage() {
         <p className="text-xs uppercase tracking-[0.24em] text-gold">Tiketing</p>
         <h1 className="mt-1 font-display text-3xl">Tahap penjualan</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted">
-          Atur kuota, harga, waktu, dan jenis tiket yang dijual di tiap tahap. Pembeli
-          otomatis masuk ke tahap yang sedang berlangsung. Harga Fast Track diatur di panel terpisah.
+          Atur kuota, harga, waktu, limit pembelian, dan jenis tiket yang dijual di tiap tahap. Pembeli
+          otomatis masuk ke tahap yang sedang berlangsung. Harga Fast Track dan pelajar diatur di panel terpisah.
         </p>
       </div>
       {liveCount > 1 ? (
@@ -87,6 +87,7 @@ function StageCard({
   const [quota, setQuota] = useState<StageQuota>(stage.quota);
   const [price, setPrice] = useState<StageQuota>(stage.price);
   const [onSale, setOnSale] = useState<StageSales>(stage.onSale);
+  const [purchaseLimit, setPurchaseLimit] = useState(stage.purchaseLimit);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -96,6 +97,7 @@ function StageCard({
     setQuota(stage.quota);
     setPrice(stage.price);
     setOnSale(stage.onSale);
+    setPurchaseLimit(stage.purchaseLimit);
   }, [stage]);
 
   async function onSave(e: React.FormEvent) {
@@ -111,6 +113,7 @@ function StageCard({
           quota,
           price,
           onSale,
+          purchaseLimit,
         },
       });
       onSaved(next);
@@ -165,6 +168,25 @@ function StageCard({
         </div>
       </div>
       <p className="text-xs text-subtle">Kosongkan tanggal jika tahap berlaku selama diaktifkan, tanpa batas waktu.</p>
+
+      <div className="grid max-w-xs gap-1.5">
+        <Label htmlFor={`${stage.id}-limit`}>Limit pembelian</Label>
+        <Input
+          id={`${stage.id}-limit`}
+          type="number"
+          min={1}
+          max={20}
+          step={1}
+          value={purchaseLimit}
+          onChange={(e) => setPurchaseLimit(Math.max(0, Number(e.target.value)))}
+        />
+        <p className="text-xs text-subtle">
+          {purchaseLimit <= 1
+            ? "Pembeli umum hanya boleh 1 tiket, 1 jenis."
+            : `Pembeli umum maksimal ${purchaseLimit || 0} tiket, boleh campur jenis.`}
+          {" "}Fast Track tidak kena limit ini. Pelajar tetap maksimal 4.
+        </p>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         {(["vvip", "vip", "festival"] as TicketTypeId[]).map((type) => {

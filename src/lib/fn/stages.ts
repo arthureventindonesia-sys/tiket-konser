@@ -49,6 +49,7 @@ export const saveStage = createServerFn({ method: "POST" })
     quota: StageQuota;
     price: StageQuota;
     onSale: StageSales;
+    purchaseLimit: number;
   }) => data)
   .handler(async ({ data }) => {
     const { requireStaff } = await import("@/lib/staff.server");

@@ -1,5 +1,5 @@
 import type { TicketTypeId } from "@/lib/event";
-import { MAX_PER_TYPE } from "@/lib/event";
+import { MAX_TOTAL_TICKETS } from "@/lib/event";
 
 export const TICKET_STAGES = [
   { id: "early_bird", label: "Early Bird", allowed: ["vip", "festival"] as const },
@@ -28,6 +28,7 @@ export type TicketStage = {
   studentPrice: StageQuota;
   onSale: StageSales;
   allowed: TicketTypeId[];
+  purchaseLimit: number;
   live: boolean;
   status: StageStatus;
 };
@@ -42,12 +43,12 @@ export type SaleOffer = {
   maxPerType: number;
 };
 
-export function maxPerTypeForStage(id: string | null | undefined): number {
-  return id === "early_bird" ? 1 : MAX_PER_TYPE;
+export function defaultPurchaseLimit(id: string | null | undefined): number {
+  return id === "early_bird" ? 1 : MAX_TOTAL_TICKETS;
 }
 
-export function isSingleTicketStage(id: string | null | undefined): boolean {
-  return id === "early_bird";
+export function maxPerTypeForStage(id: string | null | undefined): number {
+  return defaultPurchaseLimit(id);
 }
 
 export function stageDef(id: string) {

@@ -5,6 +5,7 @@ import {
   stageDef,
   stageStatus,
   maxPerTypeForStage,
+  defaultPurchaseLimit,
   type SaleOffer,
   type StageId,
   type StageQuota,
@@ -34,6 +35,7 @@ type StageRow = {
   sell_vvip?: boolean | null;
   sell_vip?: boolean | null;
   sell_festival?: boolean | null;
+  purchase_limit?: number | null;
 };
 
 function emptyQuota(): StageQuota {
@@ -125,6 +127,14 @@ async function ensureStagePrices(): Promise<void> {
   await sql.query("alter table orders add column if not exists student boolean not null default false");
   await sql.query("alter table orders add column if not exists student_card text");
   await sql.query("alter table orders add column if not exists student_card_mime text");
+  await sql.query("alter table ticket_stages add column if not exists purchase_limit int");
+  await sql.query(`
+    update ticket_stages
+    set purchase_limit = case when id = 'early_bird' then 1 else 4 end
+    where purchase_limit is null
+  `);
+  await sql.query("alter table ticket_stages alter column purchase_limit set default 4");
+  await sql.query("alter table ticket_stages alter column purchase_limit set not null");
   schemaReady = true;
 }
 
@@ -144,6 +154,12 @@ async function soldByStage(stageId: StageId): Promise<StageQuota> {
     vip: Number(row?.vip ?? 0),
     festival: Number(row?.festival ?? 0),
   };
+}
+
+function purchaseLimitFrom(row: StageRow): number {
+  const n = Number(row.purchase_limit);
+  if (Number.isFinite(n) && n >= 1) return Math.floor(n);
+  return defaultPurchaseLimit(row.id);
 }
 
 function salesFrom(row: StageRow): StageSales {
@@ -178,6 +194,7 @@ function toStage(row: StageRow, sold: StageQuota): TicketStage {
     studentPrice: studentPriceFrom(row),
     onSale,
     allowed,
+    purchaseLimit: purchaseLimitFrom(row),
     live: status === "live",
     status,
   };
@@ -217,7 +234,7 @@ export async function getSaleOffer(kind: "public" | "student" = "public"): Promi
       remaining: emptyQuota(),
       price: emptyQuota(),
       allowed: [],
-      maxPerType: kind === "student" ? MAX_TOTAL_TICKETS : maxPerTypeForStage(next?.id),
+      maxPerType: kind === "student" ? MAX_TOTAL_TICKETS : (next?.purchaseLimit ?? maxPerTypeForStage(next?.id)),
     };
   }
   const remaining = emptyQuota();
@@ -231,7 +248,7 @@ export async function getSaleOffer(kind: "public" | "student" = "public"): Promi
     remaining,
     price: kind === "student" ? stage.studentPrice : stage.price,
     allowed: stage.allowed,
-    maxPerType: kind === "student" ? MAX_TOTAL_TICKETS : maxPerTypeForStage(stage.id),
+    maxPerType: kind === "student" ? MAX_TOTAL_TICKETS : stage.purchaseLimit,
   };
 }
 
@@ -243,6 +260,7 @@ export async function updateStage(input: {
   quota: StageQuota;
   price: StageQuota;
   onSale: StageSales;
+  purchaseLimit: number;
 }): Promise<TicketStage> {
   await ensureStagePrices();
   const def = stageDef(input.id);
@@ -262,6 +280,10 @@ export async function updateStage(input: {
   if (!Object.values(input.onSale).some(Boolean)) {
     throw new Error("Aktifkan minimal satu jenis tiket");
   }
+  const purchaseLimit = Math.floor(Number(input.purchaseLimit) || 0);
+  if (purchaseLimit < 1 || purchaseLimit > 20) {
+    throw new Error("Limit pembelian harus antara 1 dan 20 tiket");
+  }
   const sql = await getSql();
   const updated = await sql<StageRow>`
     update ticket_stages
@@ -276,7 +298,8 @@ export async function updateStage(input: {
         price_festival = ${price.festival},
         sell_vvip = ${input.onSale.vvip},
         sell_vip = ${input.onSale.vip},
-        sell_festival = ${input.onSale.festival}
+        sell_festival = ${input.onSale.festival},
+        purchase_limit = ${purchaseLimit}
     where id = ${input.id}
     returning *
   `;

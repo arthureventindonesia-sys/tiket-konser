@@ -8,11 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { EVENT, MAX_PER_TYPE, MAX_TOTAL_TICKETS, TICKET_TYPES } from "@/lib/event";
+import { EVENT, MAX_TOTAL_TICKETS, TICKET_TYPES } from "@/lib/event";
 import { formatDateTime, formatRupiah, uniqueCodeFromWhatsapp } from "@/lib/format";
 import { placeOrder } from "@/lib/fn/orders";
 import { fetchSaleOffer } from "@/lib/fn/stages";
-import { isSingleTicketStage, type SaleOffer } from "@/lib/stages";
+import { type SaleOffer } from "@/lib/stages";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/beli")({
@@ -50,14 +50,14 @@ function BeliPage() {
           remaining: { vvip: 0, vip: 0, festival: 0 },
           price: { vvip: 0, vip: 0, festival: 0 },
           allowed: [],
-          maxPerType: MAX_PER_TYPE,
+          maxPerType: MAX_TOTAL_TICKETS,
         }),
       );
   }, []);
 
   const uniqueCode = uniqueCodeFromWhatsapp(whatsapp || "000");
-  const maxPerType = offer?.maxPerType ?? MAX_PER_TYPE;
-  const earlyBird = isSingleTicketStage(offer?.stage?.id);
+  const purchaseLimit = offer?.maxPerType ?? MAX_TOTAL_TICKETS;
+  const singleTicket = purchaseLimit <= 1;
   const priceOf = (id: (typeof TICKET_TYPES)[number]["id"]) =>
     offer?.price[id] || TICKET_TYPES.find((t) => t.id === id)?.price || 0;
   const baseAmount = useMemo(
@@ -68,15 +68,15 @@ function BeliPage() {
   const total = totalQty > 0 ? baseAmount + uniqueCode : 0;
 
   function setCount(id: keyof typeof qty, next: number) {
-    const cap = Math.min(maxPerType, offer?.remaining[id] ?? maxPerType);
-    if (earlyBird) {
+    const cap = Math.min(purchaseLimit, offer?.remaining[id] ?? purchaseLimit);
+    if (singleTicket) {
       const n = Math.min(cap, Math.max(0, next));
       setQty({ vvip: 0, vip: 0, festival: 0, [id]: n });
       return;
     }
     setQty((prev) => {
       const others = prev.vvip + prev.vip + prev.festival - prev[id];
-      const n = Math.min(cap, MAX_TOTAL_TICKETS - others, Math.max(0, next));
+      const n = Math.min(cap, purchaseLimit - others, Math.max(0, next));
       return { ...prev, [id]: n };
     });
   }
@@ -193,7 +193,7 @@ function BeliPage() {
           <div className="space-y-3">
             <p className="text-sm font-medium text-muted">Jenis tiket</p>
             {TICKET_TYPES.filter((t) => !offer || offer.allowed.includes(t.id)).map((t) => {
-              const sisa = offer?.remaining[t.id] ?? MAX_PER_TYPE;
+              const sisa = offer?.remaining[t.id] ?? purchaseLimit;
               const habis = Boolean(offer?.open) && sisa < 1;
               return (
                 <div
@@ -228,7 +228,7 @@ function BeliPage() {
                       disabled={
                         !offer?.open ||
                         habis ||
-                        (!earlyBird && totalQty >= MAX_TOTAL_TICKETS)
+                        (singleTicket ? qty[t.id] >= purchaseLimit : totalQty >= purchaseLimit)
                       }
                       aria-label={`Tambah ${t.label}`}
                     >
@@ -239,9 +239,9 @@ function BeliPage() {
               );
             })}
             <div className="rounded-lg border-2 border-gold bg-gold/15 px-4 py-3 text-sm font-semibold leading-relaxed text-fg">
-              {earlyBird
-                ? "Early Bird: hanya 1 jenis tiket, maksimal 1 tiket. "
-                : `Maksimal ${MAX_TOTAL_TICKETS} tiket per pembelian, boleh campur jenis. `}
+              {singleTicket
+                ? "Maksimal 1 tiket, 1 jenis. "
+                : `Maksimal ${purchaseLimit} tiket per pembelian, boleh campur jenis. `}
               Email dan WhatsApp hanya bisa dipakai satu kali pembelian.
             </div>
           </div>
