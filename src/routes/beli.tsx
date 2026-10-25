@@ -12,7 +12,7 @@ import { EVENT, MAX_TOTAL_TICKETS, TICKET_TYPES } from "@/lib/event";
 import { formatDateTime, formatRupiah, uniqueCodeFromWhatsapp } from "@/lib/format";
 import { placeOrder } from "@/lib/fn/orders";
 import { fetchSaleOffer } from "@/lib/fn/stages";
-import { type SaleOffer } from "@/lib/stages";
+import { isUnlimitedPurchase, type SaleOffer } from "@/lib/stages";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/beli")({
@@ -57,7 +57,8 @@ function BeliPage() {
 
   const uniqueCode = uniqueCodeFromWhatsapp(whatsapp || "000");
   const purchaseLimit = offer?.maxPerType ?? MAX_TOTAL_TICKETS;
-  const singleTicket = purchaseLimit <= 1;
+  const unlimited = isUnlimitedPurchase(purchaseLimit);
+  const singleTicket = !unlimited && purchaseLimit <= 1;
   const priceOf = (id: (typeof TICKET_TYPES)[number]["id"]) =>
     offer?.price[id] || TICKET_TYPES.find((t) => t.id === id)?.price || 0;
   const baseAmount = useMemo(
@@ -68,7 +69,12 @@ function BeliPage() {
   const total = totalQty > 0 ? baseAmount + uniqueCode : 0;
 
   function setCount(id: keyof typeof qty, next: number) {
-    const cap = Math.min(purchaseLimit, offer?.remaining[id] ?? purchaseLimit);
+    const remaining = offer?.remaining[id] ?? 1_000_000;
+    if (unlimited) {
+      setQty((prev) => ({ ...prev, [id]: Math.min(remaining, Math.max(0, next)) }));
+      return;
+    }
+    const cap = Math.min(purchaseLimit, remaining);
     if (singleTicket) {
       const n = Math.min(cap, Math.max(0, next));
       setQty({ vvip: 0, vip: 0, festival: 0, [id]: n });
@@ -228,7 +234,7 @@ function BeliPage() {
                       disabled={
                         !offer?.open ||
                         habis ||
-                        (singleTicket ? qty[t.id] >= purchaseLimit : totalQty >= purchaseLimit)
+                        (!unlimited && (singleTicket ? qty[t.id] >= purchaseLimit : totalQty >= purchaseLimit))
                       }
                       aria-label={`Tambah ${t.label}`}
                     >
@@ -239,9 +245,11 @@ function BeliPage() {
               );
             })}
             <div className="rounded-lg border-2 border-gold bg-gold/15 px-4 py-3 text-sm font-semibold leading-relaxed text-fg">
-              {singleTicket
-                ? "Maksimal 1 tiket, 1 jenis. "
-                : `Maksimal ${purchaseLimit} tiket per pembelian, boleh campur jenis. `}
+              {unlimited
+                ? "Jumlah tiket tidak dibatasi, boleh campur jenis. "
+                : singleTicket
+                  ? "Maksimal 1 tiket, 1 jenis. "
+                  : `Maksimal ${purchaseLimit} tiket per pembelian, boleh campur jenis. `}
               Email dan WhatsApp hanya bisa dipakai satu kali pembelian.
             </div>
           </div>

@@ -43,6 +43,12 @@ export type SaleOffer = {
   maxPerType: number;
 };
 
+export const UNLIMITED_PURCHASE = 0;
+
+export function isUnlimitedPurchase(limit: number): boolean {
+  return limit === UNLIMITED_PURCHASE;
+}
+
 export function defaultPurchaseLimit(id: string | null | undefined): number {
   return id === "early_bird" ? 1 : MAX_TOTAL_TICKETS;
 }

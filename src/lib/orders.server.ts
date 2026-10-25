@@ -10,7 +10,7 @@ import {
   type TicketTypeId,
 } from "@/lib/event";
 import { toWaNumber, uniqueCodeFromWhatsapp } from "@/lib/format";
-import { remainingOf } from "@/lib/stages";
+import { isUnlimitedPurchase, remainingOf } from "@/lib/stages";
 import { getLiveStage } from "@/lib/stages.server";
 import { ensureAdminSeeded, ensureTiketboxSchema, findAgentByCode } from "@/lib/staff.server";
 import type { AdminOrder, DashboardData, PublicOrder, TicketboxRecord } from "@/lib/types";
@@ -290,13 +290,15 @@ export async function createOrder(input: {
       }
     }
   } else {
-    const limit = Math.max(1, Math.floor(stage.purchaseLimit) || 1);
-    if (limit <= 1) {
+    const rawLimit = Math.floor(Number(stage.purchaseLimit));
+    const unlimited = isUnlimitedPurchase(rawLimit);
+    const limit = unlimited ? Number.POSITIVE_INFINITY : Math.max(1, rawLimit || 1);
+    if (!unlimited && limit <= 1) {
       const kinds = (["vvip", "vip", "festival"] as const).filter((type) => qty[type] > 0);
       if (kinds.length > 1 || totalQty > 1) {
         throw new Error(`${stage.label} hanya boleh membeli 1 tiket, 1 jenis`);
       }
-    } else if (totalQty > limit) {
+    } else if (!unlimited && totalQty > limit) {
       throw new Error(`Maksimal ${limit} tiket per pembelian, bisa campur jenis`);
     }
     for (const type of ["vvip", "vip", "festival"] as const) {
@@ -312,7 +314,7 @@ export async function createOrder(input: {
             : `Sisa kuota ${TICKET_LABEL[type]} tahap ${stage.label}: ${sisa}`,
         );
       }
-      if (qty[type] > limit) {
+      if (!unlimited && qty[type] > limit) {
         throw new Error(`Maksimal ${limit} tiket ${TICKET_LABEL[type]} pada tahap ${stage.label}`);
       }
     }

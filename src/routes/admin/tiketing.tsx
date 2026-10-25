@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { TICKET_LABEL, type TicketTypeId } from "@/lib/event";
 import { formatGroupedId, fromDatetimeLocalWib, parseGroupedId, toDatetimeLocalWib } from "@/lib/format";
 import { fetchStages, saveStage } from "@/lib/fn/stages";
-import { remainingOf, type StageQuota, type StageSales, type TicketStage } from "@/lib/stages";
+import { isUnlimitedPurchase, remainingOf, type StageQuota, type StageSales, type TicketStage } from "@/lib/stages";
 
 export const Route = createFileRoute("/admin/tiketing")({
   component: TiketingPage,
@@ -88,6 +88,7 @@ function StageCard({
   const [price, setPrice] = useState<StageQuota>(stage.price);
   const [onSale, setOnSale] = useState<StageSales>(stage.onSale);
   const [purchaseLimit, setPurchaseLimit] = useState(stage.purchaseLimit);
+  const [limitDraft, setLimitDraft] = useState(stage.purchaseLimit > 0 ? stage.purchaseLimit : 4);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -98,6 +99,7 @@ function StageCard({
     setPrice(stage.price);
     setOnSale(stage.onSale);
     setPurchaseLimit(stage.purchaseLimit);
+    if (stage.purchaseLimit > 0) setLimitDraft(stage.purchaseLimit);
   }, [stage]);
 
   async function onSave(e: React.FormEvent) {
@@ -177,13 +179,29 @@ function StageCard({
           min={1}
           max={20}
           step={1}
-          value={purchaseLimit}
-          onChange={(e) => setPurchaseLimit(Math.max(0, Number(e.target.value)))}
+          disabled={isUnlimitedPurchase(purchaseLimit)}
+          value={isUnlimitedPurchase(purchaseLimit) ? "" : purchaseLimit}
+          placeholder={isUnlimitedPurchase(purchaseLimit) ? "Unlimited" : "1–20"}
+          onChange={(e) => {
+            const n = Math.floor(Number(e.target.value));
+            if (!Number.isFinite(n) || n < 1) return;
+            setPurchaseLimit(n);
+            setLimitDraft(n);
+          }}
         />
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={isUnlimitedPurchase(purchaseLimit)}
+            onCheckedChange={(v) => setPurchaseLimit(v === true ? 0 : limitDraft || 4)}
+          />
+          Unlimited
+        </label>
         <p className="text-xs text-subtle">
-          {purchaseLimit <= 1
-            ? "Pembeli umum hanya boleh 1 tiket, 1 jenis."
-            : `Pembeli umum maksimal ${purchaseLimit || 0} tiket, boleh campur jenis.`}
+          {isUnlimitedPurchase(purchaseLimit)
+            ? "Pembeli umum tidak dibatasi jumlah tiket, boleh campur jenis. Tetap mengikuti kuota."
+            : purchaseLimit <= 1
+              ? "Pembeli umum hanya boleh 1 tiket, 1 jenis."
+              : `Pembeli umum maksimal ${purchaseLimit} tiket, boleh campur jenis.`}
           {" "}Fast Track tidak kena limit ini. Pelajar tetap maksimal 4.
         </p>
       </div>

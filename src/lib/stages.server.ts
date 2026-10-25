@@ -157,9 +157,10 @@ async function soldByStage(stageId: StageId): Promise<StageQuota> {
 }
 
 function purchaseLimitFrom(row: StageRow): number {
-  const n = Number(row.purchase_limit);
-  if (Number.isFinite(n) && n >= 1) return Math.floor(n);
-  return defaultPurchaseLimit(row.id);
+  if (row.purchase_limit == null) return defaultPurchaseLimit(row.id);
+  const n = Math.floor(Number(row.purchase_limit));
+  if (!Number.isFinite(n) || n < 0) return defaultPurchaseLimit(row.id);
+  return n;
 }
 
 function salesFrom(row: StageRow): StageSales {
@@ -280,9 +281,9 @@ export async function updateStage(input: {
   if (!Object.values(input.onSale).some(Boolean)) {
     throw new Error("Aktifkan minimal satu jenis tiket");
   }
-  const purchaseLimit = Math.floor(Number(input.purchaseLimit) || 0);
-  if (purchaseLimit < 1 || purchaseLimit > 20) {
-    throw new Error("Limit pembelian harus antara 1 dan 20 tiket");
+  const purchaseLimit = Math.floor(Number(input.purchaseLimit));
+  if (purchaseLimit !== 0 && (!Number.isFinite(purchaseLimit) || purchaseLimit < 1 || purchaseLimit > 20)) {
+    throw new Error("Limit pembelian harus antara 1 dan 20, atau unlimited");
   }
   const sql = await getSql();
   const updated = await sql<StageRow>`
