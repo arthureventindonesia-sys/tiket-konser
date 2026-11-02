@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { EVENT, MAX_PROOF_BYTES, MAX_TOTAL_TICKETS, TICKET_TYPES } from "@/lib/event";
 import { formatDateTime, formatRupiah, uniqueCodeFromWhatsapp } from "@/lib/format";
 import { placeStudentOrder } from "@/lib/fn/orders";
-import { fetchStudentOffer } from "@/lib/fn/stages";
+import { fetchReferralAgents, fetchStudentOffer } from "@/lib/fn/stages";
 import type { SaleOffer } from "@/lib/stages";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +32,7 @@ function StudentPage() {
   const [whatsapp, setWhatsapp] = useState("");
   const lockedRef = Boolean(ref?.trim());
   const [referralCode, setReferralCode] = useState((ref ?? "").toUpperCase());
+  const [agents, setAgents] = useState<{ name: string; code: string }[]>([]);
   const [qty, setQty] = useState({ vvip: 0, vip: 0, festival: 0 });
   const [card, setCard] = useState<{ dataUrl: string; mime: string; name: string } | null>(null);
   const cardInput = useRef<HTMLInputElement>(null);
@@ -53,6 +54,12 @@ function StudentPage() {
           maxPerType: MAX_TOTAL_TICKETS,
         }),
       );
+  }, []);
+
+  useEffect(() => {
+    fetchReferralAgents()
+      .then(setAgents)
+      .catch(() => setAgents([]));
   }, []);
 
   const uniqueCode = uniqueCodeFromWhatsapp(whatsapp || "000");
@@ -189,16 +196,36 @@ function StudentPage() {
               <Field label="WhatsApp" htmlFor="whatsapp">
                 <Input id="whatsapp" required inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="08xxxxxxxxxx" />
               </Field>
-              <Field label={lockedRef ? "Kode referal agen" : "Kode referal (opsional) BOLEH DI KOSONGKAN"} htmlFor="referral">
-                <Input
+              <Field label="Kode referal agen" htmlFor="referral">
+                <select
                   id="referral"
                   value={referralCode}
-                  readOnly={lockedRef}
+                  disabled={lockedRef}
                   onChange={(e) => {
-                    if (!lockedRef) setReferralCode(e.target.value.toUpperCase());
+                    if (!lockedRef) setReferralCode(e.target.value);
                   }}
-                  className={lockedRef ? "cursor-not-allowed bg-elevated/60 text-gold" : undefined}
-                />
+                  className={cn(
+                    "flex h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm text-fg outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    lockedRef && "cursor-not-allowed text-gold",
+                  )}
+                >
+                  {lockedRef ? null : <option value="">Tanpa agen</option>}
+                  {lockedRef && referralCode && !agents.some((agent) => agent.code === referralCode) ? (
+                    <option value={referralCode}>{referralCode}</option>
+                  ) : null}
+                  {agents.map((agent) => (
+                    <option key={agent.code} value={agent.code}>
+                      {agent.name} · {agent.code}
+                    </option>
+                  ))}
+                </select>
+                {lockedRef ? (
+                  <p className="text-xs text-gold">Kode referal terkunci dari tautan agen.</p>
+                ) : agents.length === 0 ? (
+                  <p className="text-xs text-subtle">Belum ada akun agen terdaftar.</p>
+                ) : (
+                  <p className="text-xs text-subtle">Pilih agen, atau biarkan tanpa agen.</p>
+                )}
               </Field>
               <Field label="Kartu pelajar" htmlFor="student-card">
                 <Input

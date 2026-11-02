@@ -11,6 +11,14 @@ export const fetchStudentOffer = createServerFn({ method: "GET" }).handler(async
   return getSaleOffer("student");
 });
 
+export const fetchReferralAgents = createServerFn({ method: "GET" }).handler(async () => {
+  const { listStaff } = await import("@/lib/staff.server");
+  return (await listStaff())
+    .filter((user) => user.role === "agent" && user.referralCode)
+    .map((user) => ({ name: user.name, code: user.referralCode as string }))
+    .sort((a, b) => a.name.localeCompare(b.name, "id"));
+});
+
 export const fetchFastTrackContext = createServerFn({ method: "GET" }).handler(async () => {
   const { requireStaff, listStaff } = await import("@/lib/staff.server");
   const { getLiveStage } = await import("@/lib/stages.server");
