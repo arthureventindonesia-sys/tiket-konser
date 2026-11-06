@@ -6,6 +6,7 @@ import {
   AUTO_CANCEL_MINUTES,
   MAX_TOTAL_TICKETS,
   TICKET_LABEL,
+  TICKET_TYPE_IDS,
   type OrderStatus,
   type TicketTypeId,
 } from "@/lib/event";
@@ -28,6 +29,7 @@ type OrderRow = {
   qty_vvip: number;
   qty_vip: number;
   qty_festival: number;
+  qty_community?: number | null;
   base_amount: number;
   unique_code: number;
   total_amount: number;
@@ -47,10 +49,11 @@ type OrderRow = {
   student_card_mime?: string | null;
 };
 
-function qtyOf(row: Pick<OrderRow, "qty_vvip" | "qty_vip" | "qty_festival">, type: TicketTypeId) {
+function qtyOf(row: Pick<OrderRow, "qty_vvip" | "qty_vip" | "qty_festival" | "qty_community">, type: TicketTypeId) {
   if (type === "vvip") return Number(row.qty_vvip);
   if (type === "vip") return Number(row.qty_vip);
-  return Number(row.qty_festival);
+  if (type === "festival") return Number(row.qty_festival);
+  return Number(row.qty_community ?? 0);
 }
 
 async function toPublic(
@@ -81,6 +84,7 @@ async function toPublic(
     qtyVvip: Number(row.qty_vvip),
     qtyVip: Number(row.qty_vip),
     qtyFestival: Number(row.qty_festival),
+    qtyCommunity: Number(row.qty_community ?? 0),
     baseAmount: Number(row.base_amount),
     uniqueCode: Number(row.unique_code),
     totalAmount: Number(row.total_amount),
@@ -222,6 +226,7 @@ export async function createOrder(input: {
   qtyVvip: number;
   qtyVip: number;
   qtyFestival: number;
+  qtyCommunity?: number;
   fastTrack?: boolean;
   student?: boolean;
   studentCardDataUrl?: string;
@@ -237,6 +242,7 @@ export async function createOrder(input: {
     vvip: Math.max(0, Math.floor(input.qtyVvip)),
     vip: Math.max(0, Math.floor(input.qtyVip)),
     festival: Math.max(0, Math.floor(input.qtyFestival)),
+    community: Math.max(0, Math.floor(input.qtyCommunity ?? 0)),
   };
   if (!email.includes("@")) throw new Error("Email tidak valid");
   if (fullName.length < 3) throw new Error("Nama sesuai KTP wajib diisi");
@@ -246,7 +252,7 @@ export async function createOrder(input: {
     throw new Error("Nomor WhatsApp tidak valid");
   }
   const waNorm = toWaNumber(whatsapp);
-  const totalQty = qty.vvip + qty.vip + qty.festival;
+  const totalQty = qty.vvip + qty.vip + qty.festival + qty.community;
   if (totalQty < 1) throw new Error("Pilih minimal satu tiket");
 
   const fastTrack = Boolean(input.fastTrack);
@@ -258,11 +264,12 @@ export async function createOrder(input: {
   if (!stage) throw new Error(fastTrack ? "Tidak ada tahap penjualan yang sedang berlangsung" : "Penjualan tiket sedang ditutup");
 
   if (student) {
+    if (qty.community > 0) throw new Error("Community tidak berlaku untuk tiket pelajar");
     assertStudentCard(input.studentCardDataUrl, input.studentCardMime);
     if (totalQty > MAX_TOTAL_TICKETS) {
       throw new Error(`Maksimal ${MAX_TOTAL_TICKETS} tiket per pembelian, bisa campur jenis`);
     }
-    for (const type of ["vvip", "vip", "festival"] as const) {
+    for (const type of TICKET_TYPE_IDS) {
       if (qty[type] < 1) continue;
       if (!stage.allowed.includes(type)) {
         throw new Error(`${TICKET_LABEL[type]} tidak dijual pada tahap ${stage.label}`);
@@ -280,7 +287,7 @@ export async function createOrder(input: {
       }
     }
   } else if (fastTrack) {
-    for (const type of ["vvip", "vip", "festival"] as const) {
+    for (const type of TICKET_TYPE_IDS) {
       if (qty[type] < 1) continue;
       if (!stage.allowed.includes(type)) {
         throw new Error(`${TICKET_LABEL[type]} sedang tidak aktif`);
@@ -294,14 +301,14 @@ export async function createOrder(input: {
     const unlimited = isUnlimitedPurchase(rawLimit);
     const limit = unlimited ? Number.POSITIVE_INFINITY : Math.max(1, rawLimit || 1);
     if (!unlimited && limit <= 1) {
-      const kinds = (["vvip", "vip", "festival"] as const).filter((type) => qty[type] > 0);
+      const kinds = TICKET_TYPE_IDS.filter((type) => qty[type] > 0);
       if (kinds.length > 1 || totalQty > 1) {
         throw new Error(`${stage.label} hanya boleh membeli 1 tiket, 1 jenis`);
       }
     } else if (!unlimited && totalQty > limit) {
       throw new Error(`Maksimal ${limit} tiket per pembelian, bisa campur jenis`);
     }
-    for (const type of ["vvip", "vip", "festival"] as const) {
+    for (const type of TICKET_TYPE_IDS) {
       if (qty[type] < 1) continue;
       if (!stage.allowed.includes(type)) {
         throw new Error(`${TICKET_LABEL[type]} tidak dijual pada tahap ${stage.label}`);
@@ -329,7 +336,7 @@ export async function createOrder(input: {
   }
 
   const unit = student ? stage.studentPrice : fastTrack ? stage.fastTrackPrice : stage.price;
-  const baseAmount = qty.vvip * unit.vvip + qty.vip * unit.vip + qty.festival * unit.festival;
+  const baseAmount = TICKET_TYPE_IDS.reduce((sum, type) => sum + qty[type] * unit[type], 0);
   const uniqueCode = uniqueCodeFromWhatsapp(whatsapp);
   const totalAmount = baseAmount + uniqueCode;
   const publicId = randomBytes(9).toString("base64url");
@@ -340,10 +347,10 @@ export async function createOrder(input: {
     inserted = await sql<OrderRow>`
     insert into orders (
       public_id, email, full_name, address, whatsapp, referral_code,
-      qty_vvip, qty_vip, qty_festival, base_amount, unique_code, total_amount, status, stage_id, whatsapp_norm, fast_track, student, student_card, student_card_mime
+      qty_vvip, qty_vip, qty_festival, qty_community, base_amount, unique_code, total_amount, status, stage_id, whatsapp_norm, fast_track, student, student_card, student_card_mime
     ) values (
       ${publicId}, ${email}, ${fullName}, ${address}, ${whatsapp}, ${referral},
-      ${qty.vvip}, ${qty.vip}, ${qty.festival}, ${baseAmount}, ${uniqueCode}, ${totalAmount},
+      ${qty.vvip}, ${qty.vip}, ${qty.festival}, ${qty.community}, ${baseAmount}, ${uniqueCode}, ${totalAmount},
       ${"awaiting_payment"}, ${stage.id}, ${waNorm}, ${fastTrack}, ${student},
       ${student ? input.studentCardDataUrl ?? null : null},
       ${student ? input.studentCardMime ?? null : null}
@@ -371,7 +378,7 @@ export async function getPublicOrder(publicId: string): Promise<PublicOrder> {
   const rows = await sql<OrderRow & { has_proof_flag: number }>`
     select
       id, public_id, email, full_name, address, whatsapp, referral_code,
-      qty_vvip, qty_vip, qty_festival, base_amount, unique_code, total_amount,
+      qty_vvip, qty_vip, qty_festival, qty_community, base_amount, unique_code, total_amount,
       status, proof_mime, proof_name, confirmed_at, created_at, stage_id,
       case when proof_data is null or proof_data = '' then 0 else 1 end as has_proof_flag
     from orders
@@ -437,7 +444,7 @@ export async function confirmOrder(orderId: number, staffId: string): Promise<Ad
   }
 
   const types: TicketTypeId[] = [];
-  for (const t of ["vvip", "vip", "festival"] as const) {
+  for (const t of TICKET_TYPE_IDS) {
     for (let i = 0; i < qtyOf(row, t); i += 1) types.push(t);
   }
 
@@ -497,7 +504,7 @@ export async function listAdminOrders(): Promise<AdminOrder[]> {
   const rows = await sql<OrderRow & { has_proof: boolean }>`
     select
       id, public_id, email, full_name, address, whatsapp, referral_code,
-      qty_vvip, qty_vip, qty_festival, base_amount, unique_code, total_amount,
+      qty_vvip, qty_vip, qty_festival, qty_community, base_amount, unique_code, total_amount,
       status, proof_mime, proof_name, confirmed_at, created_at, stage_id, student,
       (proof_data is not null) as has_proof
     from orders
@@ -574,6 +581,7 @@ export async function listConfirmedExport(range?: {
     qtyVvip: number;
     qtyVip: number;
     qtyFestival: number;
+    qtyCommunity: number;
     ticketCodes: string;
     baseAmount: number;
     uniqueCode: number;
@@ -604,6 +612,7 @@ export async function listConfirmedExport(range?: {
       qtyVvip: pub.qtyVvip,
       qtyVip: pub.qtyVip,
       qtyFestival: pub.qtyFestival,
+      qtyCommunity: pub.qtyCommunity,
       ticketCodes: pub.tickets.map((t) => t.code).join("; "),
       baseAmount: pub.baseAmount,
       uniqueCode: pub.uniqueCode,
@@ -622,6 +631,7 @@ export async function getDashboard(): Promise<DashboardData> {
     vvip: number;
     vip: number;
     festival: number;
+    community: number;
     revenue: number;
     unique_code_total: number;
     ticket_revenue: number;
@@ -631,6 +641,7 @@ export async function getDashboard(): Promise<DashboardData> {
       coalesce(sum(qty_vvip), 0)::int as vvip,
       coalesce(sum(qty_vip), 0)::int as vip,
       coalesce(sum(qty_festival), 0)::int as festival,
+      coalesce(sum(qty_community), 0)::int as community,
       coalesce(sum(total_amount), 0)::int as revenue,
       coalesce(sum(unique_code), 0)::int as unique_code_total,
       coalesce(sum(base_amount), 0)::int as ticket_revenue,
@@ -650,6 +661,7 @@ export async function getDashboard(): Promise<DashboardData> {
       vvip: Number(row.vvip),
       vip: Number(row.vip),
       festival: Number(row.festival),
+      community: Number(row.community),
     },
     revenue: Number(row.revenue),
     uniqueCodeTotal: Number(row.unique_code_total),
@@ -687,6 +699,7 @@ async function toTicketbox(row: OrderRow, queriedCode: string): Promise<Ticketbo
     qtyVvip: pub.qtyVvip,
     qtyVip: pub.qtyVip,
     qtyFestival: pub.qtyFestival,
+    qtyCommunity: pub.qtyCommunity,
     tickets: pub.tickets,
     confirmedAt: pub.confirmedAt,
     takenAt: row.taken_at ?? null,

@@ -33,7 +33,7 @@ function StudentPage() {
   const lockedRef = Boolean(ref?.trim());
   const [referralCode, setReferralCode] = useState((ref ?? "").toUpperCase());
   const [agents, setAgents] = useState<{ name: string; code: string }[]>([]);
-  const [qty, setQty] = useState({ vvip: 0, vip: 0, festival: 0 });
+  const [qty, setQty] = useState({ vvip: 0, vip: 0, festival: 0, community: 0 });
   const [card, setCard] = useState<{ dataUrl: string; mime: string; name: string } | null>(null);
   const cardInput = useRef<HTMLInputElement>(null);
   const [agreed, setAgreed] = useState(false);
@@ -48,8 +48,8 @@ function StudentPage() {
           open: false,
           message: "Penjualan tiket sedang ditutup.",
           stage: null,
-          remaining: { vvip: 0, vip: 0, festival: 0 },
-          price: { vvip: 0, vip: 0, festival: 0 },
+          remaining: { vvip: 0, vip: 0, festival: 0, community: 0 },
+          price: { vvip: 0, vip: 0, festival: 0, community: 0 },
           allowed: [],
           maxPerType: MAX_TOTAL_TICKETS,
         }),
@@ -68,13 +68,13 @@ function StudentPage() {
     () => TICKET_TYPES.reduce((sum, t) => sum + priceOf(t.id) * qty[t.id], 0),
     [qty, offer],
   );
-  const totalQty = qty.vvip + qty.vip + qty.festival;
+  const totalQty = qty.vvip + qty.vip + qty.festival + qty.community;
   const total = totalQty > 0 ? baseAmount + uniqueCode : 0;
 
   function setCount(id: keyof typeof qty, next: number) {
     const cap = offer?.remaining[id] ?? MAX_TOTAL_TICKETS;
     setQty((prev) => {
-      const others = prev.vvip + prev.vip + prev.festival - prev[id];
+      const others = prev.vvip + prev.vip + prev.festival + prev.community - prev[id];
       const n = Math.min(cap, MAX_TOTAL_TICKETS - others, Math.max(0, next));
       return { ...prev, [id]: n };
     });
@@ -83,7 +83,7 @@ function StudentPage() {
   useEffect(() => {
     if (!offer?.open) return;
     setQty((prev) => {
-      const next = { vvip: 0, vip: 0, festival: 0 };
+      const next = { vvip: 0, vip: 0, festival: 0, community: 0 };
       let left = MAX_TOTAL_TICKETS;
       for (const type of ["vvip", "vip", "festival"] as const) {
         if (!offer.allowed.includes(type)) continue;
@@ -245,7 +245,7 @@ function StudentPage() {
             <div className="space-y-3">
               <p className="text-sm font-medium text-muted">Jenis tiket</p>
               {offer ? (
-                TICKET_TYPES.filter((t) => offer.allowed.includes(t.id)).map((t) => {
+                TICKET_TYPES.filter((t) => t.id !== "community" && offer.allowed.includes(t.id)).map((t) => {
                 const sisa = offer?.remaining[t.id] ?? MAX_TOTAL_TICKETS;
                 const habis = Boolean(offer?.open) && sisa < 1;
                 return (

@@ -76,6 +76,7 @@ function AgenPage() {
                       r.qtyVvip ? `${r.qtyVvip} ${TICKET_LABEL.vvip}` : null,
                       r.qtyVip ? `${r.qtyVip} ${TICKET_LABEL.vip}` : null,
                       r.qtyFestival ? `${r.qtyFestival} ${TICKET_LABEL.festival}` : null,
+                      r.qtyCommunity ? `${r.qtyCommunity} ${TICKET_LABEL.community}` : null,
                     ]
                       .filter(Boolean)
                       .join(", ")}

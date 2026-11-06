@@ -62,6 +62,13 @@ export const TICKET_TYPES = [
     image: "/images/festival.jpg",
     perks: ["Area standing festival", "Akses penuh ke panggung utama"],
   },
+  {
+    id: "community",
+    label: "COMMUNITY",
+    price: 0,
+    image: "/images/community.svg",
+    perks: ["Area community"],
+  },
 ] as const;
 
 export type TicketTypeId = (typeof TICKET_TYPES)[number]["id"];
@@ -79,13 +86,18 @@ export const TICKET_PRICE: Record<TicketTypeId, number> = {
   vvip: 1_500_000,
   vip: 750_000,
   festival: 350_000,
+  community: 0,
 };
 
 export const TICKET_LABEL: Record<TicketTypeId, string> = {
   vvip: "VVIP",
   vip: "VIP",
   festival: "FESTIVAL",
+  community: "COMMUNITY",
 };
+
+export const TICKET_TYPE_IDS = TICKET_TYPES.map((type) => type.id);
+export const STUDENT_TICKET_IDS = TICKET_TYPE_IDS.filter((id) => id !== "community");
 
 export type OrderStatus = "awaiting_payment" | "awaiting_confirm" | "confirmed" | "cancelled";
 export type StaffRole = "admin" | "crew" | "agent" | "tiketbox";
@@ -96,8 +108,9 @@ export function staffHome(role: StaffRole): "/admin" | "/admin/agen" | "/admin/t
   return "/admin";
 }
 
-export function qtyKey(type: TicketTypeId): "qty_vvip" | "qty_vip" | "qty_festival" {
+export function qtyKey(type: TicketTypeId): "qty_vvip" | "qty_vip" | "qty_festival" | "qty_community" {
   if (type === "vvip") return "qty_vvip";
   if (type === "vip") return "qty_vip";
-  return "qty_festival";
+  if (type === "festival") return "qty_festival";
+  return "qty_community";
 }

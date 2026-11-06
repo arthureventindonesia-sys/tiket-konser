@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TICKET_LABEL, type TicketTypeId } from "@/lib/event";
+import { TICKET_LABEL, TICKET_TYPE_IDS } from "@/lib/event";
 import { formatGroupedId, parseGroupedId } from "@/lib/format";
 import { getStaffSession } from "@/lib/fn/staff";
 import { fetchStages, saveFastTrackPrices } from "@/lib/fn/stages";
@@ -105,8 +105,8 @@ function PriceCard({ stage, onSaved }: { stage: TicketStage; onSaved: (stage: Ti
         </div>
         {stage.live ? <Badge tone="success">Berlangsung</Badge> : null}
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {(["vvip", "vip", "festival"] as TicketTypeId[]).map((type) => {
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {TICKET_TYPE_IDS.map((type) => {
           const active = stage.onSale[type];
           return (
             <div key={type} className={`rounded-lg border border-border p-3 ${active ? "bg-bg" : "opacity-60"}`}>

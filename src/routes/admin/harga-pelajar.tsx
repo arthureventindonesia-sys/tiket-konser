@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TICKET_LABEL, type TicketTypeId } from "@/lib/event";
+import { STUDENT_TICKET_IDS, TICKET_LABEL } from "@/lib/event";
 import { formatGroupedId, parseGroupedId } from "@/lib/format";
 import { copyText } from "@/lib/agent-qr";
 import { getStaffSession } from "@/lib/fn/staff";
@@ -107,15 +107,19 @@ function PriceCard({ stage, onSaved }: { stage: TicketStage; onSaved: (stage: Ti
         <div>
           <h2 className="font-display text-2xl">{stage.label}</h2>
           <p className="mt-1 text-sm text-subtle">
-            {stage.allowed.length > 0
-              ? `Aktif: ${stage.allowed.map((type) => TICKET_LABEL[type]).join(" · ")}`
+            {stage.allowed.filter((type) => type !== "community").length > 0
+              ? `Aktif: ${stage.allowed
+                  .filter((type) => type !== "community")
+                  .map((type) => TICKET_LABEL[type])
+                  .join(" · ")}`
               : "Tidak ada jenis yang aktif"}
+            {" "}Community tidak berlaku untuk pelajar.
           </p>
         </div>
         {stage.live ? <Badge tone="success">Berlangsung</Badge> : null}
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
-        {(["vvip", "vip", "festival"] as TicketTypeId[]).map((type) => {
+        {STUDENT_TICKET_IDS.map((type) => {
           const active = stage.onSale[type];
           return (
             <div key={type} className={`rounded-lg border border-border p-3 ${active ? "bg-bg" : "opacity-60"}`}>

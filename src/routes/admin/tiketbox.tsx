@@ -108,7 +108,7 @@ function TiketboxPage() {
               ))}
             </ul>
             <p className="mt-2 text-xs text-subtle">
-              VVIP {record.qtyVvip} · VIP {record.qtyVip} · Festival {record.qtyFestival}
+              VVIP {record.qtyVvip} · VIP {record.qtyVip} · Festival {record.qtyFestival} · Community {record.qtyCommunity}
             </p>
           </div>
 

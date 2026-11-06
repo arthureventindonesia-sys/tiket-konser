@@ -12,6 +12,7 @@ export type PublicOrder = {
   qtyVvip: number;
   qtyVip: number;
   qtyFestival: number;
+  qtyCommunity: number;
   baseAmount: number;
   uniqueCode: number;
   totalAmount: number;
@@ -33,7 +34,7 @@ export type AdminOrder = PublicOrder & {
 };
 
 export type DashboardData = {
-  tickets: { vvip: number; vip: number; festival: number };
+  tickets: { vvip: number; vip: number; festival: number; community: number };
   revenue: number;
   uniqueCodeTotal: number;
   ticketRevenue: number;
@@ -52,6 +53,7 @@ export type TicketboxRecord = {
   qtyVvip: number;
   qtyVip: number;
   qtyFestival: number;
+  qtyCommunity: number;
   tickets: TicketCode[];
   confirmedAt: string | null;
   takenAt: string | null;

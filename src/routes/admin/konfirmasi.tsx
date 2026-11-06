@@ -23,7 +23,8 @@ type TypeFilter = "all" | TicketTypeId;
 function hasType(o: AdminOrder, type: TicketTypeId) {
   if (type === "vvip") return o.qtyVvip > 0;
   if (type === "vip") return o.qtyVip > 0;
-  return o.qtyFestival > 0;
+  if (type === "festival") return o.qtyFestival > 0;
+  return o.qtyCommunity > 0;
 }
 
 function digits(value: string) {
@@ -87,6 +88,7 @@ function KonfirmasiPage() {
       vvip: byStatus.filter((o) => hasType(o, "vvip")).length,
       vip: byStatus.filter((o) => hasType(o, "vip")).length,
       festival: byStatus.filter((o) => hasType(o, "festival")).length,
+      community: byStatus.filter((o) => hasType(o, "community")).length,
     }),
     [byStatus],
   );
@@ -193,6 +195,7 @@ function KonfirmasiPage() {
     if (o.qtyVvip) parts.push(`${o.qtyVvip} ${TICKET_LABEL.vvip}`);
     if (o.qtyVip) parts.push(`${o.qtyVip} ${TICKET_LABEL.vip}`);
     if (o.qtyFestival) parts.push(`${o.qtyFestival} ${TICKET_LABEL.festival}`);
+    if (o.qtyCommunity) parts.push(`${o.qtyCommunity} ${TICKET_LABEL.community}`);
     return parts.join(" · ");
   }
 

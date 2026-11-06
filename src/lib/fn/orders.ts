@@ -10,6 +10,7 @@ export const placeOrder = createServerFn({ method: "POST" })
     qtyVvip: number;
     qtyVip: number;
     qtyFestival: number;
+    qtyCommunity?: number;
   }) => data)
   .handler(async ({ data }) => {
     const { createOrder } = await import("@/lib/orders.server");
@@ -26,6 +27,7 @@ export const placeStudentOrder = createServerFn({ method: "POST" })
     qtyVvip: number;
     qtyVip: number;
     qtyFestival: number;
+    qtyCommunity?: number;
     studentCardDataUrl: string;
     studentCardMime: string;
   }) => data)

@@ -34,7 +34,7 @@ function BeliPage() {
   const [whatsapp, setWhatsapp] = useState("");
   const lockedRef = Boolean(ref?.trim());
   const [referralCode, setReferralCode] = useState((ref ?? "").toUpperCase());
-  const [qty, setQty] = useState({ vvip: 0, vip: 0, festival: 0 });
+  const [qty, setQty] = useState({ vvip: 0, vip: 0, festival: 0, community: 0 });
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [offer, setOffer] = useState<SaleOffer | null>(null);
@@ -47,8 +47,8 @@ function BeliPage() {
           open: false,
           message: "Penjualan tiket sedang ditutup.",
           stage: null,
-          remaining: { vvip: 0, vip: 0, festival: 0 },
-          price: { vvip: 0, vip: 0, festival: 0 },
+          remaining: { vvip: 0, vip: 0, festival: 0, community: 0 },
+          price: { vvip: 0, vip: 0, festival: 0, community: 0 },
           allowed: [],
           maxPerType: MAX_TOTAL_TICKETS,
         }),
@@ -65,7 +65,7 @@ function BeliPage() {
     () => TICKET_TYPES.reduce((sum, t) => sum + priceOf(t.id) * qty[t.id], 0),
     [qty, offer],
   );
-  const totalQty = qty.vvip + qty.vip + qty.festival;
+  const totalQty = qty.vvip + qty.vip + qty.festival + qty.community;
   const total = totalQty > 0 ? baseAmount + uniqueCode : 0;
 
   function setCount(id: keyof typeof qty, next: number) {
@@ -77,11 +77,11 @@ function BeliPage() {
     const cap = Math.min(purchaseLimit, remaining);
     if (singleTicket) {
       const n = Math.min(cap, Math.max(0, next));
-      setQty({ vvip: 0, vip: 0, festival: 0, [id]: n });
+      setQty({ vvip: 0, vip: 0, festival: 0, community: 0, [id]: n });
       return;
     }
     setQty((prev) => {
-      const others = prev.vvip + prev.vip + prev.festival - prev[id];
+      const others = prev.vvip + prev.vip + prev.festival + prev.community - prev[id];
       const n = Math.min(cap, purchaseLimit - others, Math.max(0, next));
       return { ...prev, [id]: n };
     });
@@ -109,6 +109,7 @@ function BeliPage() {
           qtyVvip: qty.vvip,
           qtyVip: qty.vip,
           qtyFestival: qty.festival,
+          qtyCommunity: qty.community,
         },
       });
       await navigate({ to: "/bayar/$orderId", params: { orderId: order.publicId } });

@@ -85,6 +85,7 @@ function DashboardPage() {
     { name: "VVIP", total: data.tickets.vvip },
     { name: "VIP", total: data.tickets.vip },
     { name: "Festival", total: data.tickets.festival },
+    { name: "Community", total: data.tickets.community },
   ];
 
   return (
@@ -147,10 +148,11 @@ function DashboardPage() {
           </div>
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Stat label="VVIP terjual" value={String(data.tickets.vvip)} />
         <Stat label="VIP terjual" value={String(data.tickets.vip)} />
         <Stat label="Festival terjual" value={String(data.tickets.festival)} />
+        <Stat label="Community terjual" value={String(data.tickets.community)} />
         <Stat label="Uang masuk" value={formatRupiah(data.ticketRevenue)} accent />
       </div>
       <div className="grid gap-4 sm:grid-cols-3">

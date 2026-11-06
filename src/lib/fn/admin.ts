@@ -58,6 +58,7 @@ export const placeFastTrack = createServerFn({ method: "POST" })
     qtyVvip: number;
     qtyVip: number;
     qtyFestival: number;
+    qtyCommunity?: number;
   }) => data)
   .handler(async ({ data }) => {
     const { requireStaff } = await import("@/lib/staff.server");

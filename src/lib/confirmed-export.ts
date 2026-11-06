@@ -8,6 +8,7 @@ export type ConfirmedExportRow = {
   qtyVvip: number;
   qtyVip: number;
   qtyFestival: number;
+  qtyCommunity: number;
   ticketCodes: string;
   baseAmount: number;
   uniqueCode: number;
@@ -25,6 +26,7 @@ const HEADERS = [
   "VVIP",
   "VIP",
   "Festival",
+  "Community",
   "Kode tiket",
   "Nominal tiket",
   "Kode unik",
@@ -83,6 +85,7 @@ function rowValues(r: ConfirmedExportRow): (string | number)[] {
     r.qtyVvip,
     r.qtyVip,
     r.qtyFestival,
+    r.qtyCommunity,
     r.ticketCodes,
     r.baseAmount,
     r.uniqueCode.toString().padStart(3, "0"),
@@ -106,7 +109,7 @@ export function downloadConfirmedCsv(rows: ConfirmedExportRow[], from?: string, 
 }
 
 export function downloadConfirmedExcel(rows: ConfirmedExportRow[], from?: string, to?: string) {
-  const numberIdx = new Set([4, 5, 6, 8, 10]);
+  const numberIdx = new Set([4, 5, 6, 7, 9, 11]);
   const cells = (values: (string | number)[], header = false) =>
     values
       .map((v, i) => {
@@ -159,6 +162,7 @@ export async function downloadConfirmedPdf(rows: ConfirmedExportRow[], from?: st
       String(r.qtyVvip),
       String(r.qtyVip),
       String(r.qtyFestival),
+      String(r.qtyCommunity),
       r.ticketCodes,
       formatRupiah(r.baseAmount),
       r.uniqueCode.toString().padStart(3, "0"),

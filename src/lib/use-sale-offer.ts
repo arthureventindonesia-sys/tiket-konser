@@ -6,8 +6,8 @@ const closed: SaleOffer = {
   open: false,
   message: "Penjualan tiket sedang ditutup.",
   stage: null,
-  remaining: { vvip: 0, vip: 0, festival: 0 },
-  price: { vvip: 0, vip: 0, festival: 0 },
+  remaining: { vvip: 0, vip: 0, festival: 0, community: 0 },
+  price: { vvip: 0, vip: 0, festival: 0, community: 0 },
   allowed: [],
   maxPerType: 4,
 };

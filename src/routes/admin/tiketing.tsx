@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TICKET_LABEL, type TicketTypeId } from "@/lib/event";
+import { TICKET_LABEL, TICKET_TYPE_IDS } from "@/lib/event";
 import { formatGroupedId, fromDatetimeLocalWib, parseGroupedId, toDatetimeLocalWib } from "@/lib/format";
 import { fetchStages, saveStage } from "@/lib/fn/stages";
 import { isUnlimitedPurchase, remainingOf, type StageQuota, type StageSales, type TicketStage } from "@/lib/stages";
@@ -206,8 +206,8 @@ function StageCard({
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {(["vvip", "vip", "festival"] as TicketTypeId[]).map((type) => {
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {TICKET_TYPE_IDS.map((type) => {
           const selling = onSale[type];
           const sold = stage.sold[type];
           const sisa = remainingOf(quota[type], sold);

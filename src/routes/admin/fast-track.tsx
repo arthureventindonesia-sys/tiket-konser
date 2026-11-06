@@ -25,7 +25,7 @@ function FastTrackPage() {
   const [whatsapp, setWhatsapp] = useState("");
   const [referralCode, setReferralCode] = useState("");
   const [agents, setAgents] = useState<{ name: string; code: string }[]>([]);
-  const [qty, setQty] = useState<Record<TicketTypeId, number>>({ vvip: 0, vip: 0, festival: 0 });
+  const [qty, setQty] = useState<Record<TicketTypeId, number>>({ vvip: 0, vip: 0, festival: 0, community: 0 });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -58,8 +58,12 @@ function FastTrackPage() {
 
   const activeTypes = TICKET_TYPES.filter((type) => stage?.allowed.includes(type.id));
   const priceOf = (type: TicketTypeId) => stage?.fastTrackPrice[type] ?? 0;
-  const totalQty = qty.vvip + qty.vip + qty.festival;
-  const base = qty.vvip * priceOf("vvip") + qty.vip * priceOf("vip") + qty.festival * priceOf("festival");
+  const totalQty = qty.vvip + qty.vip + qty.festival + qty.community;
+  const base =
+    qty.vvip * priceOf("vvip") +
+    qty.vip * priceOf("vip") +
+    qty.festival * priceOf("festival") +
+    qty.community * priceOf("community");
   const unique = whatsapp.replace(/\D/g, "").length >= 3 ? uniqueCodeFromWhatsapp(whatsapp) : 0;
 
   async function onSubmit(e: React.FormEvent) {
@@ -76,6 +80,7 @@ function FastTrackPage() {
           qtyVvip: qty.vvip,
           qtyVip: qty.vip,
           qtyFestival: qty.festival,
+          qtyCommunity: qty.community,
         },
       });
       toast.success("Pesanan Fast Track dibuat");

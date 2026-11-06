@@ -61,6 +61,7 @@ function BayarPage() {
     order?.qtyVvip ? `${TICKET_LABEL.vvip} × ${order.qtyVvip}` : "",
     order?.qtyVip ? `${TICKET_LABEL.vip} × ${order.qtyVip}` : "",
     order?.qtyFestival ? `${TICKET_LABEL.festival} × ${order.qtyFestival}` : "",
+    order?.qtyCommunity ? `${TICKET_LABEL.community} × ${order.qtyCommunity}` : "",
   ]
     .filter(Boolean)
     .join(" · ");

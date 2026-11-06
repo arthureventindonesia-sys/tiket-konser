@@ -1,5 +1,5 @@
 import { getSql } from "@/lib/db";
-import { TICKET_LABEL, TICKET_PRICE, MAX_TOTAL_TICKETS, type TicketTypeId } from "@/lib/event";
+import { TICKET_LABEL, TICKET_PRICE, TICKET_TYPE_IDS, STUDENT_TICKET_IDS, MAX_TOTAL_TICKETS, type TicketTypeId } from "@/lib/event";
 import {
   remainingOf,
   stageDef,
@@ -29,17 +29,21 @@ type StageRow = {
   ft_price_vvip?: number | null;
   ft_price_vip?: number | null;
   ft_price_festival?: number | null;
+  ft_price_community?: number | null;
   st_price_vvip?: number | null;
   st_price_vip?: number | null;
   st_price_festival?: number | null;
   sell_vvip?: boolean | null;
   sell_vip?: boolean | null;
   sell_festival?: boolean | null;
+  sell_community?: boolean | null;
+  quota_community?: number | null;
+  price_community?: number | null;
   purchase_limit?: number | null;
 };
 
 function emptyQuota(): StageQuota {
-  return { vvip: 0, vip: 0, festival: 0 };
+  return { vvip: 0, vip: 0, festival: 0, community: 0 };
 }
 
 function quotaFrom(row: StageRow): StageQuota {
@@ -47,6 +51,7 @@ function quotaFrom(row: StageRow): StageQuota {
     vvip: Number(row.quota_vvip),
     vip: Number(row.quota_vip),
     festival: Number(row.quota_festival),
+    community: Number(row.quota_community ?? 0),
   };
 }
 
@@ -55,6 +60,7 @@ function priceFrom(row: StageRow): StageQuota {
     vvip: Number(row.price_vvip ?? TICKET_PRICE.vvip),
     vip: Number(row.price_vip ?? TICKET_PRICE.vip),
     festival: Number(row.price_festival ?? TICKET_PRICE.festival),
+    community: Number(row.price_community ?? 0),
   };
 }
 
@@ -64,6 +70,7 @@ function studentPriceFrom(row: StageRow): StageQuota {
     vvip: Number(row.st_price_vvip ?? price.vvip),
     vip: Number(row.st_price_vip ?? price.vip),
     festival: Number(row.st_price_festival ?? price.festival),
+    community: 0,
   };
 }
 
@@ -73,6 +80,7 @@ function fastTrackPriceFrom(row: StageRow): StageQuota {
     vvip: Number(row.ft_price_vvip ?? price.vvip),
     vip: Number(row.ft_price_vip ?? price.vip),
     festival: Number(row.ft_price_festival ?? price.festival),
+    community: Number(row.ft_price_community ?? price.community),
   };
 }
 
@@ -135,16 +143,26 @@ async function ensureStagePrices(): Promise<void> {
   `);
   await sql.query("alter table ticket_stages alter column purchase_limit set default 4");
   await sql.query("alter table ticket_stages alter column purchase_limit set not null");
+  await sql.query("alter table orders add column if not exists qty_community int not null default 0");
+  await sql.query("alter table ticket_stages add column if not exists quota_community int not null default 0");
+  await sql.query("alter table ticket_stages add column if not exists price_community int not null default 0");
+  await sql.query("alter table ticket_stages add column if not exists ft_price_community int not null default 0");
+  await sql.query("alter table ticket_stages add column if not exists sell_community boolean not null default false");
+  await sql.query("alter table tickets drop constraint if exists tickets_ticket_type_check");
+  await sql.query(
+    "alter table tickets add constraint tickets_ticket_type_check check (ticket_type in ('vvip', 'vip', 'festival', 'community'))",
+  );
   schemaReady = true;
 }
 
 async function soldByStage(stageId: StageId): Promise<StageQuota> {
   const sql = await getSql();
-  const rows = await sql<{ vvip: number; vip: number; festival: number }>`
+  const rows = await sql<{ vvip: number; vip: number; festival: number; community: number }>`
     select
       coalesce(sum(qty_vvip), 0)::int as vvip,
       coalesce(sum(qty_vip), 0)::int as vip,
-      coalesce(sum(qty_festival), 0)::int as festival
+      coalesce(sum(qty_festival), 0)::int as festival,
+      coalesce(sum(qty_community), 0)::int as community
     from orders
     where stage_id = ${stageId} and status <> ${"cancelled"}
   `;
@@ -153,6 +171,7 @@ async function soldByStage(stageId: StageId): Promise<StageQuota> {
     vvip: Number(row?.vvip ?? 0),
     vip: Number(row?.vip ?? 0),
     festival: Number(row?.festival ?? 0),
+    community: Number(row?.community ?? 0),
   };
 }
 
@@ -170,13 +189,14 @@ function salesFrom(row: StageRow): StageSales {
     vvip: row.sell_vvip == null ? fallback.has("vvip") : Boolean(row.sell_vvip),
     vip: row.sell_vip == null ? fallback.has("vip") : Boolean(row.sell_vip),
     festival: row.sell_festival == null ? fallback.has("festival") : Boolean(row.sell_festival),
+    community: Boolean(row.sell_community),
   };
 }
 
 function toStage(row: StageRow, sold: StageQuota): TicketStage {
   const def = stageDef(row.id);
   const onSale = salesFrom(row);
-  const allowed = (["vvip", "vip", "festival"] as const).filter((type) => onSale[type]);
+  const allowed = TICKET_TYPE_IDS.filter((type) => onSale[type]);
   const enabled = Boolean(row.enabled);
   const startsAt = row.starts_at;
   const endsAt = row.ends_at;
@@ -238,8 +258,20 @@ export async function getSaleOffer(kind: "public" | "student" = "public"): Promi
       maxPerType: kind === "student" ? MAX_TOTAL_TICKETS : (next?.purchaseLimit ?? maxPerTypeForStage(next?.id)),
     };
   }
+  const allowed = kind === "student" ? stage.allowed.filter((type) => type !== "community") : stage.allowed;
+  if (kind === "student" && allowed.length === 0) {
+    return {
+      open: false,
+      message: "Tiket pelajar belum tersedia pada tahap ini.",
+      stage: { id: stage.id, label: stage.label, startsAt: stage.startsAt, endsAt: stage.endsAt },
+      remaining: emptyQuota(),
+      price: stage.studentPrice,
+      allowed: [],
+      maxPerType: MAX_TOTAL_TICKETS,
+    };
+  }
   const remaining = emptyQuota();
-  for (const type of stage.allowed) {
+  for (const type of allowed) {
     remaining[type] = remainingOf(stage.quota[type], stage.sold[type]);
   }
   return {
@@ -248,7 +280,7 @@ export async function getSaleOffer(kind: "public" | "student" = "public"): Promi
     stage: { id: stage.id, label: stage.label, startsAt: stage.startsAt, endsAt: stage.endsAt },
     remaining,
     price: kind === "student" ? stage.studentPrice : stage.price,
-    allowed: stage.allowed,
+    allowed,
     maxPerType: kind === "student" ? MAX_TOTAL_TICKETS : stage.purchaseLimit,
   };
 }
@@ -271,7 +303,7 @@ export async function updateStage(input: {
   }
   const quota = { ...input.quota };
   const price = { ...input.price };
-  for (const type of ["vvip", "vip", "festival"] as const) {
+  for (const type of TICKET_TYPE_IDS) {
     quota[type] = Math.max(0, Math.floor(Number(quota[type]) || 0));
     price[type] = Math.max(0, Math.floor(Number(price[type]) || 0));
     if (input.onSale[type] && price[type] < 1) {
@@ -294,12 +326,15 @@ export async function updateStage(input: {
         quota_vvip = ${quota.vvip},
         quota_vip = ${quota.vip},
         quota_festival = ${quota.festival},
+        quota_community = ${quota.community},
         price_vvip = ${price.vvip},
         price_vip = ${price.vip},
         price_festival = ${price.festival},
+        price_community = ${price.community},
         sell_vvip = ${input.onSale.vvip},
         sell_vip = ${input.onSale.vip},
         sell_festival = ${input.onSale.festival},
+        sell_community = ${input.onSale.community},
         purchase_limit = ${purchaseLimit}
     where id = ${input.id}
     returning *
@@ -322,7 +357,7 @@ export async function updateFastTrackPrices(input: {
   const rowNow = current[0];
   if (!rowNow) throw new Error("Tahap tidak ditemukan");
   const onSale = salesFrom(rowNow);
-  for (const type of ["vvip", "vip", "festival"] as const) {
+  for (const type of TICKET_TYPE_IDS) {
     price[type] = Math.max(0, Math.floor(Number(price[type]) || 0));
     if (onSale[type] && price[type] < 1) {
       throw new Error(`Harga Fast Track ${TICKET_LABEL[type]} wajib diisi`);
@@ -332,7 +367,8 @@ export async function updateFastTrackPrices(input: {
     update ticket_stages
     set ft_price_vvip = ${price.vvip},
         ft_price_vip = ${price.vip},
-        ft_price_festival = ${price.festival}
+        ft_price_festival = ${price.festival},
+        ft_price_community = ${price.community}
     where id = ${input.id}
     returning *
   `;
@@ -354,12 +390,13 @@ export async function updateStudentPrices(input: {
   const rowNow = current[0];
   if (!rowNow) throw new Error("Tahap tidak ditemukan");
   const onSale = salesFrom(rowNow);
-  for (const type of ["vvip", "vip", "festival"] as const) {
+  for (const type of STUDENT_TICKET_IDS) {
     price[type] = Math.max(0, Math.floor(Number(price[type]) || 0));
     if (onSale[type] && price[type] < 1) {
       throw new Error(`Harga pelajar ${TICKET_LABEL[type]} wajib diisi`);
     }
   }
+  price.community = 0;
   const updated = await sql<StageRow>`
     update ticket_stages
     set st_price_vvip = ${price.vvip},
