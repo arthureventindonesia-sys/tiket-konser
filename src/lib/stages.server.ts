@@ -152,6 +152,16 @@ async function ensureStagePrices(): Promise<void> {
   await sql.query(
     "alter table tickets add constraint tickets_ticket_type_check check (ticket_type in ('vvip', 'vip', 'festival', 'community'))",
   );
+  await sql.query(`
+    create table if not exists fast_track_sales (
+      id int primary key,
+      sell_vvip boolean not null default true,
+      sell_vip boolean not null default true,
+      sell_festival boolean not null default true,
+      sell_community boolean not null default false
+    )
+  `);
+  await sql.query("insert into fast_track_sales (id) values (1) on conflict (id) do nothing");
   schemaReady = true;
 }
 
@@ -344,6 +354,48 @@ export async function updateStage(input: {
   return toStage(row, await soldByStage(row.id));
 }
 
+export async function getFastTrackSales(): Promise<StageSales> {
+  await ensureStagePrices();
+  const sql = await getSql();
+  const rows = await sql<{
+    sell_vvip: boolean;
+    sell_vip: boolean;
+    sell_festival: boolean;
+    sell_community: boolean;
+  }>`select sell_vvip, sell_vip, sell_festival, sell_community from fast_track_sales where id = 1`;
+  const row = rows[0];
+  if (!row) return { vvip: true, vip: true, festival: true, community: false };
+  return {
+    vvip: Boolean(row.sell_vvip),
+    vip: Boolean(row.sell_vip),
+    festival: Boolean(row.sell_festival),
+    community: Boolean(row.sell_community),
+  };
+}
+
+export async function updateFastTrackSales(input: StageSales): Promise<StageSales> {
+  await ensureStagePrices();
+  const sales: StageSales = {
+    vvip: Boolean(input.vvip),
+    vip: Boolean(input.vip),
+    festival: Boolean(input.festival),
+    community: Boolean(input.community),
+  };
+  if (!Object.values(sales).some(Boolean)) {
+    throw new Error("Aktifkan minimal satu jenis tiket Fast Track");
+  }
+  const sql = await getSql();
+  await sql`
+    update fast_track_sales
+    set sell_vvip = ${sales.vvip},
+        sell_vip = ${sales.vip},
+        sell_festival = ${sales.festival},
+        sell_community = ${sales.community}
+    where id = 1
+  `;
+  return sales;
+}
+
 export async function updateFastTrackPrices(input: {
   id: StageId;
   fastTrackPrice: StageQuota;
@@ -352,17 +404,10 @@ export async function updateFastTrackPrices(input: {
   const def = stageDef(input.id);
   if (!def) throw new Error("Tahap tidak ditemukan");
   const price = { ...input.fastTrackPrice };
-  const sql = await getSql();
-  const current = await sql<StageRow>`select * from ticket_stages where id = ${input.id} limit 1`;
-  const rowNow = current[0];
-  if (!rowNow) throw new Error("Tahap tidak ditemukan");
-  const onSale = salesFrom(rowNow);
   for (const type of TICKET_TYPE_IDS) {
     price[type] = Math.max(0, Math.floor(Number(price[type]) || 0));
-    if (onSale[type] && price[type] < 1) {
-      throw new Error(`Harga Fast Track ${TICKET_LABEL[type]} wajib diisi`);
-    }
   }
+  const sql = await getSql();
   const updated = await sql<StageRow>`
     update ticket_stages
     set ft_price_vvip = ${price.vvip},

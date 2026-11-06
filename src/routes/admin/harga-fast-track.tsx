@@ -3,13 +3,14 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TICKET_LABEL, TICKET_TYPE_IDS } from "@/lib/event";
 import { formatGroupedId, parseGroupedId } from "@/lib/format";
 import { getStaffSession } from "@/lib/fn/staff";
-import { fetchStages, saveFastTrackPrices } from "@/lib/fn/stages";
-import type { StageQuota, TicketStage } from "@/lib/stages";
+import { fetchFastTrackSales, fetchStages, saveFastTrackPrices, saveFastTrackSales } from "@/lib/fn/stages";
+import type { StageQuota, StageSales, TicketStage } from "@/lib/stages";
 
 export const Route = createFileRoute("/admin/harga-fast-track")({
   component: HargaFastTrackPage,
@@ -19,6 +20,7 @@ function HargaFastTrackPage() {
   const navigate = useNavigate();
   const [allowed, setAllowed] = useState(false);
   const [stages, setStages] = useState<TicketStage[]>([]);
+  const [sales, setSales] = useState<StageSales | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,6 +43,9 @@ function HargaFastTrackPage() {
     fetchStages()
       .then(setStages)
       .catch((e) => setError(e instanceof Error ? e.message : "Gagal memuat"));
+    fetchFastTrackSales()
+      .then(setSales)
+      .catch((e) => setError(e instanceof Error ? e.message : "Gagal memuat"));
   }, [navigate]);
 
   if (!allowed) return <p className="text-muted">Memeriksa akses…</p>;
@@ -53,10 +58,11 @@ function HargaFastTrackPage() {
         <p className="text-xs uppercase tracking-[0.24em] text-gold">Harga Fast Track</p>
         <h1 className="mt-1 font-display text-3xl">Harga khusus Fast Track</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted">
-          Harga ini hanya dipakai di panel Fast Track dan tidak mengubah harga penjualan umum. Pesanan memakai
-          harga tahap yang sedang berlangsung, untuk jenis tiket yang aktif.
+          Jenis tiket Fast Track diatur di sini dan tidak mengikuti tahap yang sedang berlangsung. Harga tetap
+          per tahap: pesanan memakai harga tahap yang aktif.
         </p>
       </div>
+      {sales ? <SalesCard sales={sales} onSaved={setSales} /> : null}
       <div className="grid gap-5">
         {stages.map((stage) => (
           <PriceCard
@@ -67,6 +73,52 @@ function HargaFastTrackPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+function SalesCard({ sales, onSaved }: { sales: StageSales; onSaved: (sales: StageSales) => void }) {
+  const [onSale, setOnSale] = useState<StageSales>(sales);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setOnSale(sales);
+  }, [sales]);
+
+  async function onSave(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const next = await saveFastTrackSales({ data: onSale });
+      onSaved(next);
+      toast.success("Jenis tiket Fast Track disimpan");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSave} className="space-y-4 rounded-xl border border-border bg-surface p-5">
+      <div>
+        <h2 className="font-display text-2xl">Jenis tiket Fast Track</h2>
+        <p className="mt-1 text-sm text-subtle">Berlaku untuk semua tahap. Tidak mengubah penjualan umum atau pelajar.</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {TICKET_TYPE_IDS.map((type) => (
+          <label key={type} className="flex items-center gap-2 rounded-lg border border-border bg-bg p-3 text-sm">
+            <Checkbox
+              checked={onSale[type]}
+              onCheckedChange={(v) => setOnSale((prev) => ({ ...prev, [type]: v === true }))}
+            />
+            {TICKET_LABEL[type]}
+          </label>
+        ))}
+      </div>
+      <Button type="submit" disabled={busy}>
+        {busy ? "Menyimpan…" : "Simpan jenis Fast Track"}
+      </Button>
+    </form>
   );
 }
 
@@ -97,23 +149,14 @@ function PriceCard({ stage, onSaved }: { stage: TicketStage; onSaved: (stage: Ti
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl">{stage.label}</h2>
-          <p className="mt-1 text-sm text-subtle">
-            {stage.allowed.length > 0
-              ? `Aktif: ${stage.allowed.map((type) => TICKET_LABEL[type]).join(" · ")}`
-              : "Tidak ada jenis yang aktif"}
-          </p>
+          <p className="mt-1 text-sm text-subtle">Dipakai saat tahap ini sedang berlangsung.</p>
         </div>
         {stage.live ? <Badge tone="success">Berlangsung</Badge> : null}
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {TICKET_TYPE_IDS.map((type) => {
-          const active = stage.onSale[type];
-          return (
-            <div key={type} className={`rounded-lg border border-border p-3 ${active ? "bg-bg" : "opacity-60"}`}>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs uppercase tracking-[0.16em] text-subtle">{TICKET_LABEL[type]}</p>
-                <Badge tone={active ? "success" : "muted"}>{active ? "Aktif" : "Nonaktif"}</Badge>
-              </div>
+        {TICKET_TYPE_IDS.map((type) => (
+          <div key={type} className="rounded-lg border border-border bg-bg p-3">
+            <p className="text-xs uppercase tracking-[0.16em] text-subtle">{TICKET_LABEL[type]}</p>
               <Label htmlFor={`${stage.id}-ft-${type}`} className="mt-3 block text-xs text-muted">
                 Harga Fast Track
               </Label>
@@ -131,8 +174,7 @@ function PriceCard({ stage, onSaved }: { stage: TicketStage; onSaved: (stage: Ti
                 />
               </div>
             </div>
-          );
-        })}
+        ))}
       </div>
       <Button type="submit" disabled={busy}>
         {busy ? "Menyimpan…" : "Simpan harga Fast Track"}

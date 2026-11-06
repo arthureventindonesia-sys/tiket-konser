@@ -9,7 +9,7 @@ import { formatRupiah, uniqueCodeFromWhatsapp } from "@/lib/format";
 import { placeFastTrack } from "@/lib/fn/admin";
 import { getStaffSession } from "@/lib/fn/staff";
 import { fetchFastTrackContext } from "@/lib/fn/stages";
-import type { TicketStage } from "@/lib/stages";
+import type { StageSales, TicketStage } from "@/lib/stages";
 
 export const Route = createFileRoute("/admin/fast-track")({
   component: FastTrackPage,
@@ -18,7 +18,13 @@ export const Route = createFileRoute("/admin/fast-track")({
 function FastTrackPage() {
   const navigate = useNavigate();
   const [allowed, setAllowed] = useState(false);
-  const [stage, setStage] = useState<Pick<TicketStage, "id" | "label" | "allowed" | "fastTrackPrice"> | null>(null);
+  const [stage, setStage] = useState<Pick<TicketStage, "id" | "label" | "fastTrackPrice"> | null>(null);
+  const [fastTrackOnSale, setFastTrackOnSale] = useState<StageSales>({
+    vvip: true,
+    vip: true,
+    festival: true,
+    community: false,
+  });
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [address, setAddress] = useState("");
@@ -48,6 +54,7 @@ function FastTrackPage() {
     fetchFastTrackContext()
       .then((context) => {
         setStage(context.stage);
+        setFastTrackOnSale(context.fastTrackOnSale);
         setAgents(context.agents);
       })
       .catch(() => {
@@ -56,7 +63,7 @@ function FastTrackPage() {
       });
   }, [navigate]);
 
-  const activeTypes = TICKET_TYPES.filter((type) => stage?.allowed.includes(type.id));
+  const activeTypes = TICKET_TYPES.filter((type) => fastTrackOnSale[type.id]);
   const priceOf = (type: TicketTypeId) => stage?.fastTrackPrice[type] ?? 0;
   const totalQty = qty.vvip + qty.vip + qty.festival + qty.community;
   const base =
@@ -101,8 +108,8 @@ function FastTrackPage() {
           <p className="text-xs uppercase tracking-[0.24em] text-gold">Admin</p>
           <h1 className="mt-1 font-display text-3xl">Fast Track</h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            Pesan tiket tanpa batas jumlah maupun email dan WhatsApp. Harga memakai panel Harga Fast Track
-            untuk jenis yang sedang aktif. Pesanan tetap mengurangi kuota dan tidak dibatalkan otomatis.
+            Pesan tiket tanpa batas jumlah maupun email dan WhatsApp. Jenis tiket mengikuti pengaturan Fast Track,
+            bukan tahap yang sedang berlangsung. Harga tetap dari tahap aktif. Pesanan mengurangi kuota dan tidak dibatalkan otomatis.
           </p>
         </div>
         <div className="grid gap-4">
@@ -151,7 +158,7 @@ function FastTrackPage() {
             </p>
           ) : activeTypes.length === 0 ? (
             <p className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-muted">
-              Belum ada jenis tiket yang aktif pada {stage.label}.
+              Belum ada jenis tiket yang dijual di Fast Track. Aktifkan di Harga Fast Track.
             </p>
           ) : (
             activeTypes.map((type) => (

@@ -12,7 +12,7 @@ import {
 } from "@/lib/event";
 import { toWaNumber, uniqueCodeFromWhatsapp } from "@/lib/format";
 import { isUnlimitedPurchase, remainingOf } from "@/lib/stages";
-import { getLiveStage } from "@/lib/stages.server";
+import { getFastTrackSales, getLiveStage } from "@/lib/stages.server";
 import { ensureAdminSeeded, ensureTiketboxSchema, findAgentByCode } from "@/lib/staff.server";
 import type { AdminOrder, DashboardData, PublicOrder, TicketboxRecord } from "@/lib/types";
 
@@ -287,10 +287,11 @@ export async function createOrder(input: {
       }
     }
   } else if (fastTrack) {
+    const fastTrackOnSale = await getFastTrackSales();
     for (const type of TICKET_TYPE_IDS) {
       if (qty[type] < 1) continue;
-      if (!stage.allowed.includes(type)) {
-        throw new Error(`${TICKET_LABEL[type]} sedang tidak aktif`);
+      if (!fastTrackOnSale[type]) {
+        throw new Error(`${TICKET_LABEL[type]} tidak dijual di Fast Track`);
       }
       if (stage.fastTrackPrice[type] < 1) {
         throw new Error(`Harga Fast Track ${TICKET_LABEL[type]} belum diatur`);
