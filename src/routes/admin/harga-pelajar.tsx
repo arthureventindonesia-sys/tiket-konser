@@ -31,8 +31,8 @@ function HargaPelajarPage() {
           void navigate({ to: "/login" });
           return;
         }
-        if (staff.role !== "admin") {
-          toast.error("Harga pelajar hanya untuk admin");
+        if (!staff.panels.includes("harga-pelajar")) {
+          toast.error("Panel Harga Pelajar tidak dibuka untuk akun ini");
           void navigate({ to: "/admin" });
           return;
         }

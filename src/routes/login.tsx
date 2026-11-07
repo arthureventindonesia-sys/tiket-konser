@@ -23,7 +23,7 @@ function LoginPage() {
     getStaffSession()
       .then((staff) => {
         if (staff) {
-          void navigate({ to: staffHome(staff.role) });
+          void navigate({ to: staffHome(staff.panels) });
         }
       })
       .finally(() => setChecking(false));
@@ -34,7 +34,7 @@ function LoginPage() {
     setBusy(true);
     try {
       const staff = await staffLogin({ data: { username, password } });
-      await navigate({ to: staffHome(staff.role) });
+      await navigate({ to: staffHome(staff.panels) });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal masuk");
     } finally {

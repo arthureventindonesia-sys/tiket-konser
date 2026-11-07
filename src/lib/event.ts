@@ -102,10 +102,31 @@ export const STUDENT_TICKET_IDS = TICKET_TYPE_IDS.filter((id) => id !== "communi
 export type OrderStatus = "awaiting_payment" | "awaiting_confirm" | "confirmed" | "cancelled";
 export type StaffRole = "admin" | "crew" | "agent" | "tiketbox";
 
-export function staffHome(role: StaffRole): "/admin" | "/admin/agen" | "/admin/tiketbox" {
-  if (role === "agent") return "/admin/agen";
-  if (role === "tiketbox") return "/admin/tiketbox";
-  return "/admin";
+export const STAFF_PANELS = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "konfirmasi", label: "Konfirmasi" },
+  { id: "fast-track", label: "Fast Track" },
+  { id: "tiketing", label: "Tiketing" },
+  { id: "harga-fast-track", label: "Harga Fast Track" },
+  { id: "harga-pelajar", label: "Harga Pelajar" },
+  { id: "agen", label: "Agen" },
+  { id: "tiketbox", label: "Tiketbox" },
+  { id: "pengguna", label: "Pengguna" },
+] as const;
+
+export type StaffPanelId = (typeof STAFF_PANELS)[number]["id"];
+
+export function defaultPanelsForRole(role: StaffRole): StaffPanelId[] {
+  if (role === "admin") return STAFF_PANELS.map((panel) => panel.id);
+  if (role === "crew") return ["dashboard", "konfirmasi", "fast-track", "agen"];
+  if (role === "agent") return ["agen"];
+  return ["tiketbox"];
+}
+
+export function staffHome(panels: readonly StaffPanelId[]): "/admin" | "/admin/konfirmasi" | "/admin/fast-track" | "/admin/tiketing" | "/admin/harga-fast-track" | "/admin/harga-pelajar" | "/admin/agen" | "/admin/tiketbox" | "/admin/pengguna" {
+  const first = STAFF_PANELS.find((panel) => panels.includes(panel.id));
+  if (!first || first.id === "dashboard") return "/admin";
+  return `/admin/${first.id}`;
 }
 
 export function qtyKey(type: TicketTypeId): "qty_vvip" | "qty_vip" | "qty_festival" | "qty_community" {

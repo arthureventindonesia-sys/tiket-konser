@@ -7,7 +7,8 @@ import {
   setCookie,
 } from "@tanstack/react-start/server";
 import { getSql } from "@/lib/db";
-import type { StaffRole } from "@/lib/event";
+import type { StaffPanelId, StaffRole } from "@/lib/event";
+import { defaultPanelsForRole, STAFF_PANELS } from "@/lib/event";
 import type { ActiveStaffSession } from "@/lib/types";
 
 const scrypt = promisify(scryptCb);
@@ -20,6 +21,7 @@ export type StaffUser = {
   name: string;
   role: StaffRole;
   referralCode: string | null;
+  panels: StaffPanelId[];
 };
 
 type StaffRow = {
@@ -28,6 +30,7 @@ type StaffRow = {
   name: string;
   role: StaffRole;
   referral_code: string | null;
+  panels?: string | null;
 };
 
 async function hashPassword(password: string): Promise<string> {
@@ -51,6 +54,17 @@ function cookieSecure(): boolean {
   return proto === "https";
 }
 
+function panelsFrom(role: StaffRole, raw: string | null | undefined, username: string): StaffPanelId[] {
+  if (username === "iang") return STAFF_PANELS.map((panel) => panel.id);
+  const known = new Set<string>(STAFF_PANELS.map((panel) => panel.id));
+  if (raw == null || raw.trim() === "") return defaultPanelsForRole(role);
+  const picked = raw
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part): part is StaffPanelId => known.has(part));
+  return picked.length > 0 ? picked : defaultPanelsForRole(role);
+}
+
 function mapStaff(row: StaffRow): StaffUser {
   return {
     id: row.id,
@@ -58,6 +72,7 @@ function mapStaff(row: StaffRow): StaffUser {
     name: row.name,
     role: row.role,
     referralCode: row.referral_code,
+    panels: panelsFrom(row.role, row.panels, row.username),
   };
 }
 
@@ -75,6 +90,7 @@ export async function ensureTiketboxSchema(): Promise<void> {
   } catch {
     // constraint already matches
   }
+  await sql.query("alter table staff_users add column if not exists panels text");
   roleSchemaReady = true;
 }
 
@@ -99,7 +115,7 @@ export async function loginStaff(username: string, password: string): Promise<St
   await ensureVisitSchema();
   const sql = await getSql();
   const rows = await sql<StaffRow & { password_hash: string }>`
-    select id, username, name, role, referral_code, password_hash
+    select id, username, name, role, referral_code, panels, password_hash
     from staff_users
     where username = ${username.toLowerCase()}
     limit 1
@@ -141,7 +157,7 @@ export async function getCurrentStaff(): Promise<StaffUser | null> {
   if (!token) return null;
   const sql = await getSql();
   const rows = await sql<StaffRow>`
-    select u.id, u.username, u.name, u.role, u.referral_code
+    select u.id, u.username, u.name, u.role, u.referral_code, u.panels
     from staff_sessions s
     join staff_users u on u.id = s.staff_id
     where s.token = ${token} and s.expires_at > now()
@@ -188,6 +204,13 @@ export async function requireStaff(roles?: StaffRole[]): Promise<StaffUser> {
   return staff;
 }
 
+export async function requirePanel(...panels: StaffPanelId[]): Promise<StaffUser> {
+  const staff = await getCurrentStaff();
+  if (!staff) throw new Error("Unauthorized");
+  if (!panels.some((panel) => staff.panels.includes(panel))) throw new Error("Forbidden");
+  return staff;
+}
+
 export async function requireAdminPassword(password: string): Promise<StaffUser> {
   const staff = await requireStaff(["admin"]);
   if (!password.trim()) throw new Error("Password admin wajib diisi");
@@ -213,6 +236,7 @@ export async function createStaffAccount(input: {
   password: string;
   name: string;
   role: StaffRole;
+  panels?: StaffPanelId[];
 }): Promise<StaffUser> {
   await ensureTiketboxSchema();
   const sql = await getSql();
@@ -228,9 +252,11 @@ export async function createStaffAccount(input: {
   const id = randomBytes(12).toString("hex");
   const passwordHash = await hashPassword(input.password);
   const referral = input.role === "agent" ? makeReferralCode(username) : null;
+  const panels = panelsFrom(input.role, (input.panels ?? defaultPanelsForRole(input.role)).join(","), username);
+  if (panels.length < 1) throw new Error("Pilih minimal satu panel");
   await sql`
-    insert into staff_users (id, username, password_hash, name, role, referral_code)
-    values (${id}, ${username}, ${passwordHash}, ${input.name.trim()}, ${input.role}, ${referral})
+    insert into staff_users (id, username, password_hash, name, role, referral_code, panels)
+    values (${id}, ${username}, ${passwordHash}, ${input.name.trim()}, ${input.role}, ${referral}, ${panels.join(",")})
   `;
   return {
     id,
@@ -238,13 +264,72 @@ export async function createStaffAccount(input: {
     name: input.name.trim(),
     role: input.role,
     referralCode: referral,
+    panels,
   };
+}
+
+export async function updateStaffAccount(
+  input: {
+    id: string;
+    name: string;
+    password?: string;
+    role: StaffRole;
+    panels: StaffPanelId[];
+  },
+  actorId: string,
+): Promise<StaffUser> {
+  await ensureTiketboxSchema();
+  const sql = await getSql();
+  const rows = await sql<StaffRow>`
+    select id, username, name, role, referral_code, panels
+    from staff_users where id = ${input.id} limit 1
+  `;
+  const target = rows[0];
+  if (!target) throw new Error("Akun tidak ditemukan");
+  const name = input.name.trim();
+  if (name.length < 2) throw new Error("Nama wajib diisi");
+  const password = input.password?.trim() ?? "";
+  if (password && password.length < 6) throw new Error("Password minimal 6 karakter");
+
+  let role = input.role;
+  let panels = panelsFrom(role, input.panels.join(","), target.username);
+  if (target.username === "iang") {
+    role = "admin";
+    panels = STAFF_PANELS.map((panel) => panel.id);
+  }
+  if (panels.length < 1) throw new Error("Pilih minimal satu panel");
+  if (target.id === actorId && !panels.includes("pengguna")) {
+    throw new Error("Akun yang sedang dipakai harus tetap bisa membuka Pengguna");
+  }
+  if (target.role === "admin" && role !== "admin") {
+    const admins = await sql<{ n: number }>`
+      select count(*)::int as n from staff_users where role = 'admin'
+    `;
+    if (Number(admins[0]?.n ?? 0) <= 1) throw new Error("Tidak bisa menurunkan admin terakhir");
+  }
+
+  let referral = target.referral_code;
+  if (role === "agent" && !referral) referral = makeReferralCode(target.username);
+  const passwordHash = password ? await hashPassword(password) : null;
+  const updated = await sql<StaffRow>`
+    update staff_users
+    set name = ${name},
+        role = ${role},
+        referral_code = ${referral},
+        panels = ${panels.join(",")},
+        password_hash = coalesce(${passwordHash}, password_hash)
+    where id = ${target.id}
+    returning id, username, name, role, referral_code, panels
+  `;
+  const row = updated[0];
+  if (!row) throw new Error("Akun tidak ditemukan");
+  return mapStaff(row);
 }
 
 export async function listStaff(): Promise<StaffUser[]> {
   const sql = await getSql();
   const rows = await sql<StaffRow>`
-    select id, username, name, role, referral_code
+    select id, username, name, role, referral_code, panels
     from staff_users
     order by created_at desc
   `;
@@ -254,7 +339,7 @@ export async function listStaff(): Promise<StaffUser[]> {
 export async function findAgentByCode(code: string): Promise<StaffUser | null> {
   const sql = await getSql();
   const rows = await sql<StaffRow>`
-    select id, username, name, role, referral_code
+    select id, username, name, role, referral_code, panels
     from staff_users
     where referral_code = ${code.toUpperCase()} and role = 'agent'
     limit 1
@@ -268,7 +353,7 @@ export async function deleteStaffAccount(id: string, actorId: string): Promise<v
   if (staffId === actorId) throw new Error("Tidak bisa menghapus akun sendiri");
   const sql = await getSql();
   const rows = await sql<StaffRow>`
-    select id, username, name, role, referral_code
+    select id, username, name, role, referral_code, panels
     from staff_users where id = ${staffId} limit 1
   `;
   const target = rows[0];

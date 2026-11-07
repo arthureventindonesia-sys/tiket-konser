@@ -30,8 +30,8 @@ function HargaFastTrackPage() {
           void navigate({ to: "/login" });
           return;
         }
-        if (staff.role !== "admin") {
-          toast.error("Harga Fast Track hanya untuk admin");
+        if (!staff.panels.includes("harga-fast-track")) {
+          toast.error("Panel Harga Fast Track tidak dibuka untuk akun ini");
           void navigate({ to: "/admin" });
           return;
         }

@@ -41,8 +41,8 @@ function FastTrackPage() {
           void navigate({ to: "/login" });
           return;
         }
-        if (staff.role !== "admin" && staff.role !== "crew") {
-          toast.error("Fast Track hanya untuk admin dan crew");
+        if (!staff.panels.includes("fast-track")) {
+          toast.error("Panel Fast Track tidak dibuka untuk akun ini");
           void navigate({ to: "/admin" });
           return;
         }

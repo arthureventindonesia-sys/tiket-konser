@@ -1,14 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Copy, Download, Trash2 } from "lucide-react";
+import { Copy, Download, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { agentQrDataUrl, agentQrPoster, copyText, downloadDataUrl } from "@/lib/agent-qr";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { StaffRole } from "@/lib/event";
-import { createStaffUser, deleteStaffUser, listStaffUsers } from "@/lib/fn/staff";
+import { defaultPanelsForRole, STAFF_PANELS, type StaffPanelId, type StaffRole } from "@/lib/event";
+import { createStaffUser, deleteStaffUser, listStaffUsers, updateStaffUser } from "@/lib/fn/staff";
 
 export const Route = createFileRoute("/admin/pengguna")({
   component: PenggunaPage,
@@ -20,7 +21,37 @@ type Staff = {
   name: string;
   role: StaffRole;
   referralCode: string | null;
+  panels: StaffPanelId[];
 };
+
+function PanelPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: StaffPanelId[];
+  onChange: (next: StaffPanelId[]) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {STAFF_PANELS.map((panel) => (
+        <label key={panel.id} className="flex items-center gap-2 rounded-md border border-border bg-bg px-3 py-2 text-sm">
+          <Checkbox
+            checked={value.includes(panel.id)}
+            disabled={disabled}
+            onCheckedChange={(checked) => {
+              onChange(
+                checked === true ? [...value, panel.id] : value.filter((id) => id !== panel.id),
+              );
+            }}
+          />
+          {panel.label}
+        </label>
+      ))}
+    </div>
+  );
+}
 
 function PenggunaPage() {
   const [users, setUsers] = useState<Staff[]>([]);
@@ -29,9 +60,13 @@ function PenggunaPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<StaffRole>("crew");
+  const [panels, setPanels] = useState<StaffPanelId[]>(defaultPanelsForRole("crew"));
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ name: string; password: string; role: StaffRole; panels: StaffPanelId[] } | null>(null);
+  const [saving, setSaving] = useState(false);
 
   function load() {
     listStaffUsers()
@@ -47,16 +82,48 @@ function PenggunaPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      await createStaffUser({ data: { username, password, name, role } });
+      await createStaffUser({ data: { username, password, name, role, panels } });
       toast.success("Akun dibuat");
       setUsername("");
       setPassword("");
       setName("");
+      setRole("crew");
+      setPanels(defaultPanelsForRole("crew"));
       load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal membuat akun");
     } finally {
       setBusy(false);
+    }
+  }
+
+  function startEdit(user: Staff) {
+    setPendingDelete(null);
+    setEditing(user.id);
+    setDraft({ name: user.name, password: "", role: user.role, panels: user.panels });
+  }
+
+  async function onSaveEdit(user: Staff) {
+    if (!draft) return;
+    setSaving(true);
+    try {
+      const next = await updateStaffUser({
+        data: {
+          id: user.id,
+          name: draft.name,
+          password: draft.password,
+          role: draft.role,
+          panels: draft.panels,
+        },
+      });
+      setUsers((prev) => prev.map((item) => (item.id === user.id ? next : item)));
+      setEditing(null);
+      setDraft(null);
+      toast.success("Akun diperbarui");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -117,7 +184,11 @@ function PenggunaPage() {
             id="role"
             className="h-11 rounded-md border border-border bg-elevated px-3 text-sm text-fg"
             value={role}
-            onChange={(e) => setRole(e.target.value as StaffRole)}
+            onChange={(e) => {
+              const next = e.target.value as StaffRole;
+              setRole(next);
+              setPanels(defaultPanelsForRole(next));
+            }}
           >
             <option value="admin">Admin</option>
             <option value="crew">Crew</option>
@@ -125,12 +196,15 @@ function PenggunaPage() {
             <option value="tiketbox">Tiketbox</option>
           </select>
         </div>
+        <div className="grid gap-2">
+          <Label>Panel yang bisa diakses</Label>
+          <PanelPicker value={panels} onChange={setPanels} />
+        </div>
         <Button type="submit" className="w-full" disabled={busy}>
           {busy ? "Menyimpan…" : "Buat akun"}
         </Button>
         <p className="text-xs text-subtle">
-          Admin: semua menu. Crew: dashboard & konfirmasi. Agent: data transaksi tautan referal yang
-          sudah dikonfirmasi. Tiketbox: cek kode, cetak tiket, dan takeout.
+          Level menentukan jenis akun. Agen mendapat kode referral. Centang panel mengatur menu yang terlihat dan bisa dipakai.
         </p>
       </form>
       <div>
@@ -145,6 +219,10 @@ function PenggunaPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge tone={u.role === "admin" ? "gold" : "muted"}>{u.role}</Badge>
+                  <Button type="button" variant="outline" size="sm" onClick={() => (editing === u.id ? setEditing(null) : startEdit(u))}>
+                    <Pencil className="size-3.5" />
+                    {editing === u.id ? "Tutup" : "Edit"}
+                  </Button>
                   {u.username !== "iang" ? (
                     <Button
                       type="button"
@@ -163,6 +241,57 @@ function PenggunaPage() {
                   ) : null}
                 </div>
               </div>
+              {editing === u.id && draft ? (
+                <div className="mt-4 space-y-3 border-t border-border pt-4">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor={`edit-name-${u.id}`}>Nama</Label>
+                    <Input id={`edit-name-${u.id}`} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor={`edit-pass-${u.id}`}>Password baru</Label>
+                    <Input
+                      id={`edit-pass-${u.id}`}
+                      type="password"
+                      value={draft.password}
+                      placeholder="Kosongkan jika tidak diganti"
+                      onChange={(e) => setDraft({ ...draft, password: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor={`edit-role-${u.id}`}>Level</Label>
+                    <select
+                      id={`edit-role-${u.id}`}
+                      className="h-11 rounded-md border border-border bg-elevated px-3 text-sm text-fg"
+                      value={draft.role}
+                      disabled={u.username === "iang"}
+                      onChange={(e) => setDraft({ ...draft, role: e.target.value as StaffRole })}
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="crew">Crew</option>
+                      <option value="agent">Agent</option>
+                      <option value="tiketbox">Tiketbox</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Panel yang bisa diakses</Label>
+                    <PanelPicker
+                      value={u.username === "iang" ? STAFF_PANELS.map((panel) => panel.id) : draft.panels}
+                      onChange={(next) => setDraft({ ...draft, panels: next })}
+                      disabled={u.username === "iang"}
+                    />
+                    {u.username === "iang" ? (
+                      <p className="text-xs text-subtle">Akun utama selalu memiliki semua panel.</p>
+                    ) : null}
+                  </div>
+                  <Button type="button" disabled={saving} onClick={() => void onSaveEdit(u)}>
+                    {saving ? "Menyimpan…" : "Simpan perubahan"}
+                  </Button>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-subtle">
+                  {STAFF_PANELS.filter((panel) => u.panels.includes(panel.id)).map((panel) => panel.label).join(" · ")}
+                </p>
+              )}
               {u.role === "agent" && u.referralCode ? (
                 <AgentLink
                   name={u.name}

@@ -6,23 +6,23 @@ export const fetchConfirmedExport = createServerFn({ method: "POST" })
     to: input?.to?.trim() || "",
   }))
   .handler(async ({ data }) => {
-    const { requireStaff } = await import("@/lib/staff.server");
+    const { requirePanel } = await import("@/lib/staff.server");
     const { listConfirmedExport } = await import("@/lib/orders.server");
-    await requireStaff(["admin", "crew"]);
+    await requirePanel("dashboard");
     return listConfirmedExport({ from: data.from || null, to: data.to || null });
   });
 
 export const fetchDashboard = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireStaff } = await import("@/lib/staff.server");
+  const { requirePanel } = await import("@/lib/staff.server");
   const { getDashboard } = await import("@/lib/orders.server");
-  await requireStaff(["admin", "crew"]);
+  await requirePanel("dashboard");
   return getDashboard();
 });
 
 export const fetchConfirmations = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireStaff } = await import("@/lib/staff.server");
+  const { requirePanel } = await import("@/lib/staff.server");
   const { listAdminOrders, confirmationMessage } = await import("@/lib/orders.server");
-  await requireStaff(["admin", "crew"]);
+  await requirePanel("konfirmasi");
   const orders = await listAdminOrders();
   return orders.map((order) => ({
     ...order,
@@ -33,18 +33,18 @@ export const fetchConfirmations = createServerFn({ method: "GET" }).handler(asyn
 export const fetchOrderProof = createServerFn({ method: "POST" })
   .validator((orderId: number) => orderId)
   .handler(async ({ data }) => {
-    const { requireStaff } = await import("@/lib/staff.server");
+    const { requirePanel } = await import("@/lib/staff.server");
     const { getOrderProof } = await import("@/lib/orders.server");
-    await requireStaff(["admin", "crew"]);
+    await requirePanel("konfirmasi");
     return getOrderProof(data);
   });
 
 export const fetchStudentCard = createServerFn({ method: "POST" })
   .validator((orderId: number) => orderId)
   .handler(async ({ data }) => {
-    const { requireStaff } = await import("@/lib/staff.server");
+    const { requirePanel } = await import("@/lib/staff.server");
     const { getStudentCard } = await import("@/lib/orders.server");
-    await requireStaff(["admin", "crew"]);
+    await requirePanel("konfirmasi");
     return getStudentCard(data);
   });
 
@@ -61,18 +61,18 @@ export const placeFastTrack = createServerFn({ method: "POST" })
     qtyCommunity?: number;
   }) => data)
   .handler(async ({ data }) => {
-    const { requireStaff } = await import("@/lib/staff.server");
+    const { requirePanel } = await import("@/lib/staff.server");
     const { createOrder } = await import("@/lib/orders.server");
-    await requireStaff(["admin", "crew"]);
+    await requirePanel("fast-track");
     return createOrder({ ...data, fastTrack: true });
   });
 
 export const confirmPayment = createServerFn({ method: "POST" })
   .validator((orderId: number) => orderId)
   .handler(async ({ data }) => {
-    const { requireStaff } = await import("@/lib/staff.server");
+    const { requirePanel } = await import("@/lib/staff.server");
     const { confirmOrder, confirmationMessage } = await import("@/lib/orders.server");
-    const staff = await requireStaff(["admin", "crew"]);
+    const staff = await requirePanel("konfirmasi");
     const order = await confirmOrder(data, staff.id);
     return { ...order, waText: confirmationMessage(order) };
   });
@@ -80,16 +80,16 @@ export const confirmPayment = createServerFn({ method: "POST" })
 export const cancelPayment = createServerFn({ method: "POST" })
   .validator((input: { orderId: number }) => ({ orderId: Number(input?.orderId) }))
   .handler(async ({ data }) => {
-    const { requireStaff } = await import("@/lib/staff.server");
+    const { requirePanel } = await import("@/lib/staff.server");
     const { cancelOrder } = await import("@/lib/orders.server");
-    const staff = await requireStaff(["admin", "crew"]);
+    const staff = await requirePanel("konfirmasi");
     return cancelOrder(data.orderId, staff.id);
   });
 
 export const fetchAgentSales = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireStaff } = await import("@/lib/staff.server");
+  const { requirePanel } = await import("@/lib/staff.server");
   const { listAgentOrders } = await import("@/lib/orders.server");
-  const staff = await requireStaff(["admin", "crew", "agent"]);
+  const staff = await requirePanel("agen");
   if (staff.role === "agent") {
     if (!staff.referralCode) return [];
     return listAgentOrders(staff.referralCode);

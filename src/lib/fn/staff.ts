@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { StaffRole } from "@/lib/event";
+import type { StaffPanelId, StaffRole } from "@/lib/event";
 
 export const getStaffSession = createServerFn({ method: "GET" }).handler(async () => {
   const { getCurrentStaff } = await import("@/lib/staff.server");
@@ -20,17 +20,25 @@ export const staffLogout = createServerFn({ method: "POST" }).handler(async () =
 });
 
 export const listStaffUsers = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireStaff, listStaff } = await import("@/lib/staff.server");
-  await requireStaff(["admin"]);
+  const { requirePanel, listStaff } = await import("@/lib/staff.server");
+  await requirePanel("pengguna");
   return listStaff();
 });
 
 export const createStaffUser = createServerFn({ method: "POST" })
-  .validator((data: { username: string; password: string; name: string; role: StaffRole }) => data)
+  .validator((data: { username: string; password: string; name: string; role: StaffRole; panels: StaffPanelId[] }) => data)
   .handler(async ({ data }) => {
-    const { requireStaff, createStaffAccount } = await import("@/lib/staff.server");
-    await requireStaff(["admin"]);
+    const { requirePanel, createStaffAccount } = await import("@/lib/staff.server");
+    await requirePanel("pengguna");
     return createStaffAccount(data);
+  });
+
+export const updateStaffUser = createServerFn({ method: "POST" })
+  .validator((data: { id: string; name: string; password?: string; role: StaffRole; panels: StaffPanelId[] }) => data)
+  .handler(async ({ data }) => {
+    const { requirePanel, updateStaffAccount } = await import("@/lib/staff.server");
+    const staff = await requirePanel("pengguna");
+    return updateStaffAccount(data, staff.id);
   });
 
 export const deleteStaffUser = createServerFn({ method: "POST" })
@@ -39,8 +47,8 @@ export const deleteStaffUser = createServerFn({ method: "POST" })
     return { id: String(input.id) };
   })
   .handler(async ({ data }) => {
-    const { requireStaff, deleteStaffAccount } = await import("@/lib/staff.server");
-    const staff = await requireStaff(["admin"]);
+    const { requirePanel, deleteStaffAccount } = await import("@/lib/staff.server");
+    const staff = await requirePanel("pengguna");
     await deleteStaffAccount(data.id, staff.id);
     return { ok: true as const };
   });

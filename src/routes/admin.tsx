@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tan
 import { LayoutDashboard, LogOut, ScanLine, Ticket, TicketCheck, Users, Share2, Zap, BadgeDollarSign, GraduationCap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getStaffSession, staffLogout } from "@/lib/fn/staff";
-import type { StaffRole } from "@/lib/event";
+import { STAFF_PANELS, staffHome, type StaffPanelId, type StaffRole } from "@/lib/event";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin")({
@@ -15,7 +15,25 @@ type Staff = {
   name: string;
   role: StaffRole;
   referralCode: string | null;
+  panels: StaffPanelId[];
 };
+
+const PANEL_ICON = {
+  dashboard: LayoutDashboard,
+  konfirmasi: TicketCheck,
+  "fast-track": Zap,
+  tiketing: Ticket,
+  "harga-fast-track": BadgeDollarSign,
+  "harga-pelajar": GraduationCap,
+  agen: Share2,
+  tiketbox: ScanLine,
+  pengguna: Users,
+} as const;
+
+function pathAllowed(pathname: string, panels: readonly StaffPanelId[]) {
+  if (pathname === "/admin" || pathname === "/admin/") return panels.includes("dashboard");
+  return STAFF_PANELS.some((panel) => panel.id !== "dashboard" && panels.includes(panel.id) && pathname.startsWith(`/admin/${panel.id}`));
+}
 
 function AdminLayout() {
   const navigate = useNavigate();
@@ -31,11 +49,8 @@ function AdminLayout() {
           return;
         }
         setStaff(s);
-        if (s.role === "agent" && (pathname === "/admin" || pathname === "/admin/")) {
-          void navigate({ to: "/admin/agen" });
-        }
-        if (s.role === "tiketbox" && pathname !== "/admin/tiketbox") {
-          void navigate({ to: "/admin/tiketbox" });
+        if (!pathAllowed(pathname, s.panels)) {
+          void navigate({ to: staffHome(s.panels) });
         }
       })
       .finally(() => setReady(true));
@@ -45,34 +60,12 @@ function AdminLayout() {
     return <div className="grid min-h-dvh place-items-center bg-bg text-muted">Memuat panel…</div>;
   }
 
-  const links: {
-    to: "/admin" | "/admin/konfirmasi" | "/admin/tiketing" | "/admin/harga-fast-track" | "/admin/harga-pelajar" | "/admin/fast-track" | "/admin/pengguna" | "/admin/agen" | "/admin/tiketbox";
-    label: string;
-    icon: typeof LayoutDashboard;
-    exact: boolean;
-  }[] = [];
-  if (staff.role === "admin" || staff.role === "crew") {
-    links.push({ to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true });
-    links.push({ to: "/admin/konfirmasi", label: "Konfirmasi", icon: TicketCheck, exact: false });
-    links.push({ to: "/admin/fast-track", label: "Fast Track", icon: Zap, exact: false });
-  }
-  if (staff.role === "admin") {
-    links.push({ to: "/admin/tiketing", label: "Tiketing", icon: Ticket, exact: false });
-    links.push({ to: "/admin/harga-fast-track", label: "Harga Fast Track", icon: BadgeDollarSign, exact: false });
-    links.push({ to: "/admin/harga-pelajar", label: "Harga Pelajar", icon: GraduationCap, exact: false });
-    links.push({ to: "/admin/pengguna", label: "Pengguna", icon: Users, exact: false });
-  }
-  if (staff.role !== "tiketbox") {
-    links.push({
-      to: "/admin/agen",
-      label: staff.role === "agent" ? "Transaksi" : "Agen",
-      icon: Share2,
-      exact: false,
-    });
-  }
-  if (staff.role === "admin" || staff.role === "tiketbox") {
-    links.push({ to: "/admin/tiketbox", label: "Tiketbox", icon: ScanLine, exact: false });
-  }
+  const links = STAFF_PANELS.filter((panel) => staff.panels.includes(panel.id)).map((panel) => ({
+    to: panel.id === "dashboard" ? ("/admin" as const) : (`/admin/${panel.id}` as const),
+    label: panel.id === "agen" && staff.role === "agent" ? "Transaksi" : panel.label,
+    icon: PANEL_ICON[panel.id],
+    exact: panel.id === "dashboard",
+  }));
 
   return (
     <div className="min-h-dvh bg-bg md:grid md:grid-cols-[220px_1fr]">

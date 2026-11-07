@@ -20,9 +20,9 @@ export const fetchReferralAgents = createServerFn({ method: "GET" }).handler(asy
 });
 
 export const fetchFastTrackContext = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireStaff, listStaff } = await import("@/lib/staff.server");
+  const { requirePanel, listStaff } = await import("@/lib/staff.server");
   const { getFastTrackSales, getLiveStage } = await import("@/lib/stages.server");
-  await requireStaff(["admin", "crew"]);
+  await requirePanel("fast-track");
   const stage = await getLiveStage();
   const fastTrackOnSale = await getFastTrackSales();
   const agents = (await listStaff())
@@ -43,25 +43,25 @@ export const fetchFastTrackContext = createServerFn({ method: "GET" }).handler(a
 });
 
 export const fetchFastTrackSales = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireStaff } = await import("@/lib/staff.server");
+  const { requirePanel } = await import("@/lib/staff.server");
   const { getFastTrackSales } = await import("@/lib/stages.server");
-  await requireStaff(["admin"]);
+  await requirePanel("harga-fast-track");
   return getFastTrackSales();
 });
 
 export const saveFastTrackSales = createServerFn({ method: "POST" })
   .validator((data: StageSales) => data)
   .handler(async ({ data }) => {
-    const { requireStaff } = await import("@/lib/staff.server");
+    const { requirePanel } = await import("@/lib/staff.server");
     const { updateFastTrackSales } = await import("@/lib/stages.server");
-    await requireStaff(["admin"]);
+    await requirePanel("harga-fast-track");
     return updateFastTrackSales(data);
   });
 
 export const fetchStages = createServerFn({ method: "GET" }).handler(async () => {
-  const { requireStaff } = await import("@/lib/staff.server");
+  const { requirePanel } = await import("@/lib/staff.server");
   const { listStages } = await import("@/lib/stages.server");
-  await requireStaff(["admin"]);
+  await requirePanel("tiketing", "harga-fast-track", "harga-pelajar");
   return listStages();
 });
 
@@ -77,26 +77,26 @@ export const saveStage = createServerFn({ method: "POST" })
     purchaseLimit: number;
   }) => data)
   .handler(async ({ data }) => {
-    const { requireStaff } = await import("@/lib/staff.server");
+    const { requirePanel } = await import("@/lib/staff.server");
     const { updateStage } = await import("@/lib/stages.server");
-    await requireStaff(["admin"]);
+    await requirePanel("tiketing");
     return updateStage(data);
   });
 
 export const saveFastTrackPrices = createServerFn({ method: "POST" })
   .validator((data: { id: StageId; fastTrackPrice: StageQuota }) => data)
   .handler(async ({ data }) => {
-    const { requireStaff } = await import("@/lib/staff.server");
+    const { requirePanel } = await import("@/lib/staff.server");
     const { updateFastTrackPrices } = await import("@/lib/stages.server");
-    await requireStaff(["admin"]);
+    await requirePanel("harga-fast-track");
     return updateFastTrackPrices(data);
   });
 
 export const saveStudentPrices = createServerFn({ method: "POST" })
   .validator((data: { id: StageId; studentPrice: StageQuota }) => data)
   .handler(async ({ data }) => {
-    const { requireStaff } = await import("@/lib/staff.server");
+    const { requirePanel } = await import("@/lib/staff.server");
     const { updateStudentPrices } = await import("@/lib/stages.server");
-    await requireStaff(["admin"]);
+    await requirePanel("harga-pelajar");
     return updateStudentPrices(data);
   });
