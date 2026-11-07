@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, LogOut, ScanLine, Ticket, TicketCheck, Users, Share2, Zap, BadgeDollarSign, GraduationCap } from "lucide-react";
+import { LayoutDashboard, LogOut, ScanLine, Ticket, TicketCheck, Users, Share2, Zap, BadgeDollarSign, GraduationCap, Store } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getStaffSession, staffLogout } from "@/lib/fn/staff";
 import { STAFF_PANELS, staffHome, type StaffPanelId, type StaffRole } from "@/lib/event";
@@ -27,6 +27,7 @@ const PANEL_ICON = {
   "harga-pelajar": GraduationCap,
   agen: Share2,
   tiketbox: ScanLine,
+  ots: Store,
   pengguna: Users,
 } as const;
 

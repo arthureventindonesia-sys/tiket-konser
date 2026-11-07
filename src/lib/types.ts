@@ -1,6 +1,8 @@
 import type { OrderStatus, TicketTypeId } from "@/lib/event";
 
-export type TicketCode = { type: TicketTypeId; code: string };
+export type TicketCode = { type: TicketTypeId; code: string; unitPrice: number | null };
+
+export type TicketPrices = Record<TicketTypeId, number | null>;
 
 export type PublicOrder = {
   publicId: string;
@@ -19,6 +21,9 @@ export type PublicOrder = {
   status: OrderStatus;
   hasProof: boolean;
   student: boolean;
+  fastTrack: boolean;
+  stageLabel: string | null;
+  ticketPrice: TicketPrices;
   createdAt: string;
   confirmedAt: string | null;
   tickets: TicketCode[];
@@ -55,6 +60,11 @@ export type TicketboxRecord = {
   qtyFestival: number;
   qtyCommunity: number;
   tickets: TicketCode[];
+  stageLabel: string | null;
+  student: boolean;
+  fastTrack: boolean;
+  ticketPrice: TicketPrices;
+  liveStage: { id: string; label: string; price: Record<TicketTypeId, number> } | null;
   confirmedAt: string | null;
   takenAt: string | null;
   takenBy: string | null;

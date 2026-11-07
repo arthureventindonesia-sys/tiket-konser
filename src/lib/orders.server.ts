@@ -7,11 +7,12 @@ import {
   MAX_TOTAL_TICKETS,
   TICKET_LABEL,
   TICKET_TYPE_IDS,
+  qtyKey,
   type OrderStatus,
   type TicketTypeId,
 } from "@/lib/event";
-import { toWaNumber, uniqueCodeFromWhatsapp } from "@/lib/format";
-import { isUnlimitedPurchase, remainingOf } from "@/lib/stages";
+import { toWaNumber, uniqueCodeFromWhatsapp, formatRupiah } from "@/lib/format";
+import { isUnlimitedPurchase, remainingOf, stageDef } from "@/lib/stages";
 import { getFastTrackSales, getLiveStage } from "@/lib/stages.server";
 import { ensureAdminSeeded, ensureTiketboxSchema, findAgentByCode } from "@/lib/staff.server";
 import type { AdminOrder, DashboardData, PublicOrder, TicketboxRecord } from "@/lib/types";
@@ -40,6 +41,11 @@ type OrderRow = {
   confirmed_at: string | null;
   created_at: string;
   stage_id: string | null;
+  fast_track?: boolean | null;
+  price_vvip?: number | null;
+  price_vip?: number | null;
+  price_festival?: number | null;
+  price_community?: number | null;
   taken_at?: string | null;
   taken_by?: string | null;
   cancelled_at?: string | null;
@@ -56,6 +62,33 @@ function qtyOf(row: Pick<OrderRow, "qty_vvip" | "qty_vip" | "qty_festival" | "qt
   return Number(row.qty_community ?? 0);
 }
 
+function paidPrice(row: OrderRow, type: TicketTypeId): number | null {
+  const stored =
+    type === "vvip"
+      ? row.price_vvip
+      : type === "vip"
+        ? row.price_vip
+        : type === "festival"
+          ? row.price_festival
+          : row.price_community;
+  if (stored != null && Number(stored) > 0) return Number(stored);
+  if (qtyOf(row, type) < 1) return null;
+  const kinds = TICKET_TYPE_IDS.filter((item) => qtyOf(row, item) > 0);
+  if (kinds.length !== 1) return null;
+  const qty = qtyOf(row, type);
+  const base = Number(row.base_amount);
+  return qty > 0 && base > 0 ? Math.round(base / qty) : null;
+}
+
+function ticketPriceOf(row: OrderRow): PublicOrder["ticketPrice"] {
+  return {
+    vvip: paidPrice(row, "vvip"),
+    vip: paidPrice(row, "vip"),
+    festival: paidPrice(row, "festival"),
+    community: paidPrice(row, "community"),
+  };
+}
+
 async function toPublic(
   row: OrderRow,
   includeTickets: boolean,
@@ -68,10 +101,10 @@ async function toPublic(
       tickets.push(...(ticketMap.get(row.id) ?? []));
     } else {
       const sql = await getSql();
-      const rows = await sql<{ ticket_type: TicketTypeId; code: string }>`
-        select ticket_type, code from tickets where order_id = ${row.id} order by id
+      const rows = await sql<{ ticket_type: TicketTypeId; code: string; unit_price: number | null }>`
+        select ticket_type, code, unit_price from tickets where order_id = ${row.id} order by id
       `;
-      for (const t of rows) tickets.push({ type: t.ticket_type, code: t.code });
+      for (const t of rows) tickets.push({ type: t.ticket_type, code: t.code, unitPrice: t.unit_price == null ? null : Number(t.unit_price) });
     }
   }
   return {
@@ -91,6 +124,9 @@ async function toPublic(
     status: row.status,
     hasProof: Boolean(row.proof_data),
     student: Boolean(row.student),
+    fastTrack: Boolean(row.fast_track),
+    stageLabel: row.stage_id ? (stageDef(row.stage_id)?.label ?? row.stage_id) : null,
+    ticketPrice: ticketPriceOf(row),
     createdAt: row.created_at,
     confirmedAt: row.confirmed_at,
     tickets,
@@ -119,6 +155,16 @@ async function ensureIdentitySchema(): Promise<void> {
   await sql.query("alter table orders add column if not exists student boolean not null default false");
   await sql.query("alter table orders add column if not exists student_card text");
   await sql.query("alter table orders add column if not exists student_card_mime text");
+  await sql.query("alter table orders add column if not exists price_vvip int");
+  await sql.query("alter table orders add column if not exists price_vip int");
+  await sql.query("alter table orders add column if not exists price_festival int");
+  await sql.query("alter table orders add column if not exists price_community int");
+  await sql.query("alter table tickets add column if not exists unit_price int");
+  await sql.query("alter table tickets add column if not exists upgrade_from text");
+  await sql.query("alter table tickets add column if not exists upgrade_paid int");
+  await sql.query("alter table tickets add column if not exists upgrade_stage text");
+  await sql.query("alter table orders add column if not exists onsite boolean not null default false");
+  await sql.query("alter table orders add column if not exists payment_method text");
   try {
     await sql.query(`
       do $c$
@@ -158,10 +204,10 @@ async function ensureIdentitySchema(): Promise<void> {
     await sql.query("drop index if exists orders_email_lower_uidx");
     await sql.query("drop index if exists orders_whatsapp_norm_uidx");
     await sql.query(
-      "create unique index if not exists orders_email_lower_uidx on orders (lower(email)) where status <> 'cancelled' and fast_track = false",
+      "create unique index if not exists orders_email_lower_uidx on orders (lower(email)) where status <> 'cancelled' and fast_track = false and onsite = false",
     );
     await sql.query(
-      "create unique index if not exists orders_whatsapp_norm_uidx on orders (whatsapp_norm) where status <> 'cancelled' and fast_track = false and whatsapp_norm is not null",
+      "create unique index if not exists orders_whatsapp_norm_uidx on orders (whatsapp_norm) where status <> 'cancelled' and fast_track = false and onsite = false and whatsapp_norm is not null",
     );
   } catch {
     /* unique already partial */
@@ -348,13 +394,15 @@ export async function createOrder(input: {
     inserted = await sql<OrderRow>`
     insert into orders (
       public_id, email, full_name, address, whatsapp, referral_code,
-      qty_vvip, qty_vip, qty_festival, qty_community, base_amount, unique_code, total_amount, status, stage_id, whatsapp_norm, fast_track, student, student_card, student_card_mime
+      qty_vvip, qty_vip, qty_festival, qty_community, base_amount, unique_code, total_amount, status, stage_id, whatsapp_norm, fast_track, student, student_card, student_card_mime,
+      price_vvip, price_vip, price_festival, price_community
     ) values (
       ${publicId}, ${email}, ${fullName}, ${address}, ${whatsapp}, ${referral},
       ${qty.vvip}, ${qty.vip}, ${qty.festival}, ${qty.community}, ${baseAmount}, ${uniqueCode}, ${totalAmount},
       ${"awaiting_payment"}, ${stage.id}, ${waNorm}, ${fastTrack}, ${student},
       ${student ? input.studentCardDataUrl ?? null : null},
-      ${student ? input.studentCardMime ?? null : null}
+      ${student ? input.studentCardMime ?? null : null},
+      ${unit.vvip}, ${unit.vip}, ${unit.festival}, ${unit.community}
     )
     returning *
   `;
@@ -373,6 +421,88 @@ export async function createOrder(input: {
   return toPublic(row, false);
 }
 
+export async function createOnsiteOrder(input: {
+  fullName: string;
+  whatsapp: string;
+  qtyVvip: number;
+  qtyVip: number;
+  qtyFestival: number;
+  qtyCommunity?: number;
+  paymentMethod: "qris" | "cash";
+  staffId: string;
+}): Promise<{ ticketCode: string }> {
+  await expireUnpaidOrders();
+  await ensureIdentitySchema();
+  const fullName = input.fullName.trim();
+  const whatsapp = input.whatsapp.trim();
+  const paymentMethod = input.paymentMethod === "qris" ? "qris" : input.paymentMethod === "cash" ? "cash" : "";
+  if (paymentMethod !== "qris" && paymentMethod !== "cash") throw new Error("Pilih QRIS atau Cash");
+  if (fullName.length < 2) throw new Error("Nama wajib diisi");
+  const waDigits = whatsapp.replace(/\D/g, "");
+  if (waDigits.length < 10 || waDigits.length > 15) throw new Error("Nomor WhatsApp tidak valid");
+  const qty = {
+    vvip: Math.max(0, Math.floor(input.qtyVvip)),
+    vip: Math.max(0, Math.floor(input.qtyVip)),
+    festival: Math.max(0, Math.floor(input.qtyFestival)),
+    community: Math.max(0, Math.floor(input.qtyCommunity ?? 0)),
+  };
+  const totalQty = qty.vvip + qty.vip + qty.festival + qty.community;
+  if (totalQty < 1) throw new Error("Pilih minimal satu tiket");
+  const stage = await getLiveStage();
+  if (!stage) throw new Error("Tidak ada tahap penjualan yang sedang berlangsung");
+  for (const type of TICKET_TYPE_IDS) {
+    if (qty[type] < 1) continue;
+    if (!stage.allowed.includes(type)) throw new Error(`${TICKET_LABEL[type]} tidak dijual pada tahap ${stage.label}`);
+    if (stage.price[type] < 1) throw new Error(`Harga ${TICKET_LABEL[type]} belum diatur`);
+    const sisa = remainingOf(stage.quota[type], stage.sold[type]);
+    if (qty[type] > sisa) {
+      throw new Error(
+        sisa < 1 ? `Kuota ${TICKET_LABEL[type]} ${stage.label} habis` : `Sisa kuota ${TICKET_LABEL[type]} tahap ${stage.label}: ${sisa}`,
+      );
+    }
+  }
+  const unit = stage.price;
+  const baseAmount = TICKET_TYPE_IDS.reduce((sum, type) => sum + qty[type] * unit[type], 0);
+  const uniqueCode = 0;
+  const totalAmount = baseAmount;
+  const publicId = randomBytes(9).toString("base64url");
+  const email = `onsite.${randomBytes(8).toString("hex")}@gsf.local`;
+  const waNorm = toWaNumber(whatsapp);
+  const sql = await getSql();
+  const inserted = await sql<OrderRow>`
+    insert into orders (
+      public_id, email, full_name, address, whatsapp, referral_code,
+      qty_vvip, qty_vip, qty_festival, qty_community, base_amount, unique_code, total_amount, status, stage_id, whatsapp_norm, fast_track, student,
+      price_vvip, price_vip, price_festival, price_community, onsite, payment_method, confirmed_at, confirmed_by
+    ) values (
+      ${publicId}, ${email}, ${fullName}, ${"Pembelian di lokasi"}, ${whatsapp}, ${null},
+      ${qty.vvip}, ${qty.vip}, ${qty.festival}, ${qty.community}, ${baseAmount}, ${uniqueCode}, ${totalAmount},
+      ${"confirmed"}, ${stage.id}, ${waNorm}, ${false}, ${false},
+      ${unit.vvip}, ${unit.vip}, ${unit.festival}, ${unit.community}, ${true}, ${paymentMethod}, now(), ${input.staffId}
+    )
+    returning *
+  `;
+  const row = inserted[0];
+  if (!row) throw new Error("Gagal membuat pesanan");
+  const types: TicketTypeId[] = [];
+  for (const type of TICKET_TYPE_IDS) {
+    for (let i = 0; i < qty[type]; i += 1) types.push(type);
+  }
+  let firstCode = "";
+  for (const type of types) {
+    let code = makeTicketCode(type);
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const clash = await sql<{ id: number }>`select id from tickets where code = ${code} limit 1`;
+      if (clash.length === 0) break;
+      code = makeTicketCode(type);
+    }
+    await sql`insert into tickets (order_id, ticket_type, code) values (${row.id}, ${type}, ${code})`;
+    if (!firstCode) firstCode = code;
+  }
+  if (!firstCode) throw new Error("Gagal membuat kode tiket");
+  return { ticketCode: firstCode };
+}
+
 export async function getPublicOrder(publicId: string): Promise<PublicOrder> {
   await expireUnpaidOrders();
   const sql = await getSql();
@@ -380,7 +510,8 @@ export async function getPublicOrder(publicId: string): Promise<PublicOrder> {
     select
       id, public_id, email, full_name, address, whatsapp, referral_code,
       qty_vvip, qty_vip, qty_festival, qty_community, base_amount, unique_code, total_amount,
-      status, proof_mime, proof_name, confirmed_at, created_at, stage_id,
+      status, proof_mime, proof_name, confirmed_at, created_at, stage_id, student, fast_track,
+      price_vvip, price_vip, price_festival, price_community,
       case when proof_data is null or proof_data = '' then 0 else 1 end as has_proof_flag
     from orders
     where public_id = ${publicId}
@@ -506,7 +637,8 @@ export async function listAdminOrders(): Promise<AdminOrder[]> {
     select
       id, public_id, email, full_name, address, whatsapp, referral_code,
       qty_vvip, qty_vip, qty_festival, qty_community, base_amount, unique_code, total_amount,
-      status, proof_mime, proof_name, confirmed_at, created_at, stage_id, student,
+      status, proof_mime, proof_name, confirmed_at, created_at, stage_id, student, fast_track,
+      price_vvip, price_vip, price_festival, price_community,
       (proof_data is not null) as has_proof
     from orders
     order by
@@ -521,13 +653,17 @@ export async function listAdminOrders(): Promise<AdminOrder[]> {
   const confirmedIds = rows.filter((row) => row.status === "confirmed").map((row) => row.id);
   const ticketMap = new Map<number, PublicOrder["tickets"]>();
   if (confirmedIds.length > 0) {
-    const tickets = await sql.query<{ order_id: number; ticket_type: TicketTypeId; code: string }>(
-      "select order_id, ticket_type, code from tickets where order_id = any($1::int[]) order by id",
+    const tickets = await sql.query<{ order_id: number; ticket_type: TicketTypeId; code: string; unit_price: number | null }>(
+      "select order_id, ticket_type, code, unit_price from tickets where order_id = any($1::int[]) order by id",
       [confirmedIds],
     );
     for (const ticket of tickets) {
       const list = ticketMap.get(ticket.order_id) ?? [];
-      list.push({ type: ticket.ticket_type, code: ticket.code });
+      list.push({
+        type: ticket.ticket_type,
+        code: ticket.code,
+        unitPrice: ticket.unit_price == null ? null : Number(ticket.unit_price),
+      });
       ticketMap.set(ticket.order_id, list);
     }
   }
@@ -674,7 +810,13 @@ export async function getDashboard(): Promise<DashboardData> {
 }
 
 export function confirmationMessage(order: PublicOrder): string {
-  const lines = order.tickets.map((t, i) => `${i + 1}. ${t.code} (${TICKET_LABEL[t.type]})`);
+  const stage = order.stageLabel ?? "tahap tidak tercatat";
+  const channel = order.student ? " · Pelajar" : order.fastTrack ? " · Fast Track" : "";
+  const lines = order.tickets.map((t, i) => {
+    const price = t.unitPrice ?? order.ticketPrice[t.type];
+    const harga = price != null ? formatRupiah(price) : "harga tidak tercatat";
+    return `${i + 1}. ${t.code} (${TICKET_LABEL[t.type]})\nHarga tiket: ${harga}\nTahap pembelian: ${stage}${channel}`;
+  });
   return [
     `Halo ${order.fullName},`,
     "",
@@ -702,6 +844,11 @@ async function toTicketbox(row: OrderRow, queriedCode: string): Promise<Ticketbo
     qtyFestival: pub.qtyFestival,
     qtyCommunity: pub.qtyCommunity,
     tickets: pub.tickets,
+    stageLabel: pub.stageLabel,
+    student: pub.student,
+    fastTrack: pub.fastTrack,
+    ticketPrice: pub.ticketPrice,
+    liveStage: null,
     confirmedAt: pub.confirmedAt,
     takenAt: row.taken_at ?? null,
     takenBy: row.taken_by ?? null,
@@ -710,6 +857,7 @@ async function toTicketbox(row: OrderRow, queriedCode: string): Promise<Ticketbo
 }
 
 export async function lookupByTicketCode(code: string): Promise<TicketboxRecord> {
+  await ensureIdentitySchema();
   await ensureTiketboxSchema();
   const needle = code.trim().toUpperCase();
   if (needle.length < 4) throw new Error("Masukkan kode tiket");
@@ -724,16 +872,122 @@ export async function lookupByTicketCode(code: string): Promise<TicketboxRecord>
   const rows = await sql<OrderRow>`select * from orders where id = ${found.order_id} limit 1`;
   const row = rows[0];
   if (!row || row.status !== "confirmed") throw new Error("Kode tiket tidak ditemukan");
-  return toTicketbox(row, found.code);
+  return withLiveStage(await toTicketbox(row, found.code));
+}
+
+async function withLiveStage(record: TicketboxRecord): Promise<TicketboxRecord> {
+  const stage = await getLiveStage();
+  return {
+    ...record,
+    liveStage: stage ? { id: stage.id, label: stage.label, price: stage.price } : null,
+  };
+}
+
+export async function upgradeTicket(code: string, toType: TicketTypeId): Promise<TicketboxRecord> {
+  await ensureIdentitySchema();
+  await ensureTiketboxSchema();
+  if (!TICKET_TYPE_IDS.includes(toType)) throw new Error("Jenis tiket tidak valid");
+  const needle = code.trim().toUpperCase();
+  const sql = await getSql();
+  const hit = await sql<{
+    id: number;
+    order_id: number;
+    ticket_type: TicketTypeId;
+    code: string;
+    unit_price: number | null;
+  }>`
+    select id, order_id, ticket_type, code, unit_price
+    from tickets
+    where upper(code) = ${needle}
+    limit 1
+  `;
+  const ticket = hit[0];
+  if (!ticket) throw new Error("Kode tiket tidak ditemukan");
+  if (ticket.ticket_type === toType) throw new Error("Tiket sudah berjenis itu");
+  const rows = await sql<OrderRow>`select * from orders where id = ${ticket.order_id} limit 1`;
+  const order = rows[0];
+  if (!order || order.status !== "confirmed") throw new Error("Tiket belum terkonfirmasi");
+  const stage = await getLiveStage();
+  if (!stage) throw new Error("Tidak ada tahap penjualan yang sedang berlangsung");
+  const from = ticket.ticket_type;
+  const currentTo = stage.price[toType];
+  if (currentTo < 1) throw new Error("Harga tahap yang berlangsung belum diatur");
+  const awal =
+    ticket.unit_price != null && Number(ticket.unit_price) > 0 ? Number(ticket.unit_price) : paidPrice(order, from);
+  if (awal == null || awal < 1) throw new Error("Harga awal tiket tidak tercatat");
+  const selisih = currentTo - awal;
+  if (selisih < 1) throw new Error("Harga tahap berlangsung tidak lebih tinggi dari harga awal");
+  const hargaBaru = awal + selisih;
+  const soldUpgrades = await sql<{ n: number }>`
+    select coalesce(count(*), 0)::int as n
+    from tickets
+    where ticket_type = ${toType} and upgrade_stage = ${stage.id} and id <> ${ticket.id}
+  `;
+  const sisa = remainingOf(stage.quota[toType], stage.sold[toType] + Number(soldUpgrades[0]?.n ?? 0));
+  if (sisa < 1) throw new Error(`Kuota ${TICKET_LABEL[toType]} tahap ${stage.label} habis`);
+
+  let newCode = makeTicketCode(toType);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const clash = await sql<{ id: number }>`select id from tickets where code = ${newCode} limit 1`;
+    if (clash.length === 0) break;
+    newCode = makeTicketCode(toType);
+  }
+
+  await sql`
+    update tickets
+    set ticket_type = ${toType},
+        code = ${newCode},
+        unit_price = ${hargaBaru},
+        upgrade_from = ${from},
+        upgrade_paid = ${selisih},
+        upgrade_stage = ${stage.id}
+    where id = ${ticket.id}
+  `;
+  const fromColumn = qtyKey(from);
+  try {
+    const updatedOrder = await sql.query<{ id: number }>(
+      `update orders set
+         qty_vvip = qty_vvip + case when $1 = 'vvip' then -1 when $2 = 'vvip' then 1 else 0 end,
+         qty_vip = qty_vip + case when $1 = 'vip' then -1 when $2 = 'vip' then 1 else 0 end,
+         qty_festival = qty_festival + case when $1 = 'festival' then -1 when $2 = 'festival' then 1 else 0 end,
+         qty_community = qty_community + case when $1 = 'community' then -1 when $2 = 'community' then 1 else 0 end,
+         base_amount = base_amount + $3,
+         total_amount = total_amount + $3,
+         price_vvip = case when $2 = 'vvip' and qty_vvip = 0 then $4 else price_vvip end,
+         price_vip = case when $2 = 'vip' and qty_vip = 0 then $4 else price_vip end,
+         price_festival = case when $2 = 'festival' and qty_festival = 0 then $4 else price_festival end,
+         price_community = case when $2 = 'community' and qty_community = 0 then $4 else price_community end
+       where id = $5 and ${fromColumn} >= 1
+       returning id`,
+      [from, toType, selisih, hargaBaru, order.id],
+    );
+    if (updatedOrder.length < 1) throw new Error("Jumlah tiket tidak cukup untuk di-upgrade");
+  } catch (err) {
+    await sql`
+      update tickets
+      set ticket_type = ${from},
+          code = ${ticket.code},
+          unit_price = ${ticket.unit_price},
+          upgrade_from = null,
+          upgrade_paid = null,
+          upgrade_stage = null
+      where id = ${ticket.id}
+    `;
+    throw err instanceof Error ? err : new Error("Gagal upgrade tiket");
+  }
+
+  const fresh = await sql<OrderRow>`select * from orders where id = ${order.id} limit 1`;
+  return withLiveStage(await toTicketbox(fresh[0] ?? order, newCode));
 }
 
 export async function takeoutOrder(orderId: number, username: string): Promise<TicketboxRecord> {
+  await ensureIdentitySchema();
   await ensureTiketboxSchema();
   const sql = await getSql();
   const rows = await sql<OrderRow>`select * from orders where id = ${orderId} limit 1`;
   const row = rows[0];
   if (!row || row.status !== "confirmed") throw new Error("Tiket tidak ditemukan");
-  if (row.taken_at) return toTicketbox(row, "");
+  if (row.taken_at) return withLiveStage(await toTicketbox(row, ""));
   const updated = await sql<OrderRow>`
     update orders
     set taken_at = now(),
@@ -742,7 +996,7 @@ export async function takeoutOrder(orderId: number, username: string): Promise<T
     returning *
   `;
   const next = updated[0] ?? row;
-  return toTicketbox(next, "");
+  return withLiveStage(await toTicketbox(next, ""));
 }
 
 export async function resetAllSales(): Promise<{ orders: number; tickets: number }> {

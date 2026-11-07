@@ -20,6 +20,7 @@ import { Route as AdminFastTrackRouteImport } from './routes/admin/fast-track'
 import { Route as AdminHargaFastTrackRouteImport } from './routes/admin/harga-fast-track'
 import { Route as AdminHargaPelajarRouteImport } from './routes/admin/harga-pelajar'
 import { Route as AdminKonfirmasiRouteImport } from './routes/admin/konfirmasi'
+import { Route as AdminOtsRouteImport } from './routes/admin/ots'
 import { Route as AdminPenggunaRouteImport } from './routes/admin/pengguna'
 import { Route as AdminTiketboxRouteImport } from './routes/admin/tiketbox'
 import { Route as AdminTiketingRouteImport } from './routes/admin/tiketing'
@@ -82,6 +83,11 @@ const AdminKonfirmasiRoute = AdminKonfirmasiRouteImport.update({
   path: '/konfirmasi',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminOtsRoute = AdminOtsRouteImport.update({
+  id: '/ots',
+  path: '/ots',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminPenggunaRoute = AdminPenggunaRouteImport.update({
   id: '/pengguna',
   path: '/pengguna',
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/admin/harga-fast-track': typeof AdminHargaFastTrackRoute
   '/admin/harga-pelajar': typeof AdminHargaPelajarRoute
   '/admin/konfirmasi': typeof AdminKonfirmasiRoute
+  '/admin/ots': typeof AdminOtsRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
   '/admin/tiketbox': typeof AdminTiketboxRoute
   '/admin/tiketing': typeof AdminTiketingRoute
@@ -142,6 +149,7 @@ export interface FileRoutesByTo {
   '/admin/harga-fast-track': typeof AdminHargaFastTrackRoute
   '/admin/harga-pelajar': typeof AdminHargaPelajarRoute
   '/admin/konfirmasi': typeof AdminKonfirmasiRoute
+  '/admin/ots': typeof AdminOtsRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
   '/admin/tiketbox': typeof AdminTiketboxRoute
   '/admin/tiketing': typeof AdminTiketingRoute
@@ -162,6 +170,7 @@ export interface FileRoutesById {
   '/admin/harga-fast-track': typeof AdminHargaFastTrackRoute
   '/admin/harga-pelajar': typeof AdminHargaPelajarRoute
   '/admin/konfirmasi': typeof AdminKonfirmasiRoute
+  '/admin/ots': typeof AdminOtsRoute
   '/admin/pengguna': typeof AdminPenggunaRoute
   '/admin/tiketbox': typeof AdminTiketboxRoute
   '/admin/tiketing': typeof AdminTiketingRoute
@@ -183,6 +192,7 @@ export interface FileRouteTypes {
     | '/admin/harga-fast-track'
     | '/admin/harga-pelajar'
     | '/admin/konfirmasi'
+    | '/admin/ots'
     | '/admin/pengguna'
     | '/admin/tiketbox'
     | '/admin/tiketing'
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
     | '/admin/harga-fast-track'
     | '/admin/harga-pelajar'
     | '/admin/konfirmasi'
+    | '/admin/ots'
     | '/admin/pengguna'
     | '/admin/tiketbox'
     | '/admin/tiketing'
@@ -220,6 +231,7 @@ export interface FileRouteTypes {
     | '/admin/harga-fast-track'
     | '/admin/harga-pelajar'
     | '/admin/konfirmasi'
+    | '/admin/ots'
     | '/admin/pengguna'
     | '/admin/tiketbox'
     | '/admin/tiketing'
@@ -319,6 +331,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminKonfirmasiRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/ots': {
+      id: '/admin/ots'
+      path: '/ots'
+      fullPath: '/admin/ots'
+      preLoaderRoute: typeof AdminOtsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/pengguna': {
       id: '/admin/pengguna'
       path: '/pengguna'
@@ -370,6 +389,7 @@ interface AdminRouteChildren {
   AdminHargaFastTrackRoute: typeof AdminHargaFastTrackRoute
   AdminHargaPelajarRoute: typeof AdminHargaPelajarRoute
   AdminKonfirmasiRoute: typeof AdminKonfirmasiRoute
+  AdminOtsRoute: typeof AdminOtsRoute
   AdminPenggunaRoute: typeof AdminPenggunaRoute
   AdminTiketboxRoute: typeof AdminTiketboxRoute
   AdminTiketingRoute: typeof AdminTiketingRoute
@@ -382,6 +402,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminHargaFastTrackRoute: AdminHargaFastTrackRoute,
   AdminHargaPelajarRoute: AdminHargaPelajarRoute,
   AdminKonfirmasiRoute: AdminKonfirmasiRoute,
+  AdminOtsRoute: AdminOtsRoute,
   AdminPenggunaRoute: AdminPenggunaRoute,
   AdminTiketboxRoute: AdminTiketboxRoute,
   AdminTiketingRoute: AdminTiketingRoute,

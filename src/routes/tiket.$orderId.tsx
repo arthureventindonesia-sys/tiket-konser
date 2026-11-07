@@ -103,6 +103,23 @@ function TiketPage() {
                         {TICKET_LABEL[t.type]}
                       </p>
                       <p className="mt-1 font-mono text-xl tracking-wide text-fg">{t.code}</p>
+                      <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3 text-sm">
+                        <div>
+                          <dt className="text-[11px] uppercase tracking-[0.14em] text-subtle">Harga tiket</dt>
+                          <dd className="mt-0.5 font-medium">
+                            {((t.unitPrice ?? order.ticketPrice[t.type]) != null
+                              ? formatRupiah((t.unitPrice ?? order.ticketPrice[t.type])!)
+                              : "Tidak tercatat")}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-[11px] uppercase tracking-[0.14em] text-subtle">Tahap pembelian</dt>
+                          <dd className="mt-0.5 font-medium">
+                            {order.stageLabel ?? "Tidak tercatat"}
+                            {order.student ? " · Pelajar" : order.fastTrack ? " · Fast Track" : ""}
+                          </dd>
+                        </div>
+                      </dl>
                       <p className="mt-2 text-xs text-subtle">Satu kode · satu orang · tunjukkan saat masuk</p>
                     </div>
                   </li>

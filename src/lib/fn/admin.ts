@@ -67,6 +67,43 @@ export const placeFastTrack = createServerFn({ method: "POST" })
     return createOrder({ ...data, fastTrack: true });
   });
 
+export const fetchOnsiteContext = createServerFn({ method: "GET" }).handler(async () => {
+  const { requirePanel } = await import("@/lib/staff.server");
+  const { getLiveStage } = await import("@/lib/stages.server");
+  await requirePanel("ots");
+  const stage = await getLiveStage();
+  if (!stage) return null;
+  return {
+    id: stage.id,
+    label: stage.label,
+    allowed: stage.allowed,
+    price: stage.price,
+    remaining: {
+      vvip: Math.max(0, stage.quota.vvip > 0 ? stage.quota.vvip - stage.sold.vvip : 999999),
+      vip: Math.max(0, stage.quota.vip > 0 ? stage.quota.vip - stage.sold.vip : 999999),
+      festival: Math.max(0, stage.quota.festival > 0 ? stage.quota.festival - stage.sold.festival : 999999),
+      community: Math.max(0, stage.quota.community > 0 ? stage.quota.community - stage.sold.community : 999999),
+    },
+  };
+});
+
+export const placeOnsiteOrder = createServerFn({ method: "POST" })
+  .validator((data: {
+    fullName: string;
+    whatsapp: string;
+    qtyVvip: number;
+    qtyVip: number;
+    qtyFestival: number;
+    qtyCommunity?: number;
+    paymentMethod: "qris" | "cash";
+  }) => data)
+  .handler(async ({ data }) => {
+    const { requirePanel } = await import("@/lib/staff.server");
+    const { createOnsiteOrder } = await import("@/lib/orders.server");
+    const staff = await requirePanel("ots");
+    return createOnsiteOrder({ ...data, staffId: staff.id });
+  });
+
 export const confirmPayment = createServerFn({ method: "POST" })
   .validator((orderId: number) => orderId)
   .handler(async ({ data }) => {

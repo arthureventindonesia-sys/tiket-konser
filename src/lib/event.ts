@@ -111,6 +111,7 @@ export const STAFF_PANELS = [
   { id: "harga-pelajar", label: "Harga Pelajar" },
   { id: "agen", label: "Agen" },
   { id: "tiketbox", label: "Tiketbox" },
+  { id: "ots", label: "OTS" },
   { id: "pengguna", label: "Pengguna" },
 ] as const;
 
@@ -123,7 +124,7 @@ export function defaultPanelsForRole(role: StaffRole): StaffPanelId[] {
   return ["tiketbox"];
 }
 
-export function staffHome(panels: readonly StaffPanelId[]): "/admin" | "/admin/konfirmasi" | "/admin/fast-track" | "/admin/tiketing" | "/admin/harga-fast-track" | "/admin/harga-pelajar" | "/admin/agen" | "/admin/tiketbox" | "/admin/pengguna" {
+export function staffHome(panels: readonly StaffPanelId[]): "/admin" | "/admin/konfirmasi" | "/admin/fast-track" | "/admin/tiketing" | "/admin/harga-fast-track" | "/admin/harga-pelajar" | "/admin/agen" | "/admin/tiketbox" | "/admin/ots" | "/admin/pengguna" {
   const first = STAFF_PANELS.find((panel) => panels.includes(panel.id));
   if (!first || first.id === "dashboard") return "/admin";
   return `/admin/${first.id}`;

@@ -358,9 +358,22 @@ function KonfirmasiPage() {
                     ) : null}
                   </div>
                   {confirmed && o.tickets.length > 0 ? (
-                    <p className="mt-3 font-mono text-xs text-muted">
-                      {o.tickets.map((t) => t.code).join(" · ")}
-                    </p>
+                    <ul className="mt-3 space-y-1 text-xs text-muted">
+                      {o.tickets.map((t) => (
+                        <li key={t.code}>
+                          <span className="font-mono text-fg">{t.code}</span>
+                          {" · "}
+                          {TICKET_LABEL[t.type]}
+                          {" · Harga tiket "}
+                          {(t.unitPrice ?? o.ticketPrice[t.type]) != null
+                            ? formatRupiah((t.unitPrice ?? o.ticketPrice[t.type])!)
+                            : "tidak tercatat"}
+                          {" · Tahap "}
+                          {o.stageLabel ?? "tidak tercatat"}
+                          {o.student ? " · Pelajar" : o.fastTrack ? " · Fast Track" : ""}
+                        </li>
+                      ))}
+                    </ul>
                   ) : null}
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button
