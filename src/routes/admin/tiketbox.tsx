@@ -127,6 +127,7 @@ function TiketboxPage() {
             <Item label="Email" value={record.email} />
             <Item label="WhatsApp" value={record.whatsapp} />
             <Item label="Alamat" value={record.address} />
+            <Item label="Pembayaran" value={record.payment} />
           </dl>
 
           <div>
@@ -149,6 +150,8 @@ function TiketboxPage() {
                           Harga tiket {paid != null ? formatRupiah(paid) : "tidak tercatat"}
                           {" · "}
                           Tahap {record.stageLabel ?? "tidak tercatat"}
+                          {" · "}
+                          {record.payment}
                           {record.student ? " · Pelajar" : record.fastTrack ? " · Fast Track" : ""}
                         </span>
                       </span>

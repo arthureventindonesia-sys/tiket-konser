@@ -118,10 +118,10 @@ function BayarPage() {
                   className="h-11 w-full text-sm font-bold"
                   onClick={() => navigate({ to: "/upload/$orderId", params: { orderId } })}
                 >
-                  KONFIRMASI PEMBAYARAN
+                  UNGGAH BUKTI TRANSFER
                 </Button>
                 <p className="text-center text-[10px] text-subtle">
-                  Scan, transfer sesuai nominal, lalu konfirmasi.{" "}
+                  Scan QRIS, transfer sesuai nominal, lalu unggah bukti transfer.{" "}
                   <Link to="/" className="underline-offset-2 hover:underline">
                     Beranda
                   </Link>

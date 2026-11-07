@@ -119,6 +119,10 @@ function TiketPage() {
                             {order.student ? " · Pelajar" : order.fastTrack ? " · Fast Track" : ""}
                           </dd>
                         </div>
+                        <div className="col-span-2">
+                          <dt className="text-[11px] uppercase tracking-[0.14em] text-subtle">Pembayaran</dt>
+                          <dd className="mt-0.5 font-medium">{order.payment}</dd>
+                        </div>
                       </dl>
                       <p className="mt-2 text-xs text-subtle">Satu kode · satu orang · tunjukkan saat masuk</p>
                     </div>

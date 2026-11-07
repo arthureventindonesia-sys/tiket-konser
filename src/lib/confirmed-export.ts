@@ -14,6 +14,7 @@ export type ConfirmedExportRow = {
   uniqueCode: number;
   totalAmount: number;
   referralCode: string;
+  payment: "Cash" | "QRIS";
   confirmedAt: string;
   createdAt: string;
 };
@@ -31,6 +32,7 @@ const HEADERS = [
   "Nominal tiket",
   "Kode unik",
   "Total bayar",
+  "Pembayaran",
   "Referal",
   "Dikonfirmasi",
 ] as const;
@@ -90,6 +92,7 @@ function rowValues(r: ConfirmedExportRow): (string | number)[] {
     r.baseAmount,
     r.uniqueCode.toString().padStart(3, "0"),
     r.totalAmount,
+    r.payment,
     r.referralCode,
     confirmedLabel(r.confirmedAt),
   ];
@@ -167,6 +170,7 @@ export async function downloadConfirmedPdf(rows: ConfirmedExportRow[], from?: st
       formatRupiah(r.baseAmount),
       r.uniqueCode.toString().padStart(3, "0"),
       formatRupiah(r.totalAmount),
+      r.payment,
       r.referralCode,
       confirmedLabel(r.confirmedAt),
     ]),

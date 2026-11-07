@@ -91,7 +91,7 @@ function FastTrackPage() {
         },
       });
       toast.success("Pesanan Fast Track dibuat");
-      await navigate({ to: "/bayar/$orderId", params: { orderId: order.publicId } });
+      window.location.assign(`/bayar/${encodeURIComponent(order.publicId)}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal membuat pesanan");
     } finally {
@@ -108,8 +108,9 @@ function FastTrackPage() {
           <p className="text-xs uppercase tracking-[0.24em] text-gold">Admin</p>
           <h1 className="mt-1 font-display text-3xl">Fast Track</h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            Pesan tiket tanpa batas jumlah maupun email dan WhatsApp. Jenis tiket mengikuti pengaturan Fast Track,
-            bukan tahap yang sedang berlangsung. Harga tetap dari tahap aktif. Pesanan mengurangi kuota dan tidak dibatalkan otomatis.
+            Pesan tiket tanpa batas jumlah maupun email dan WhatsApp. Setelah checkout, pembeli diarahkan ke QRIS,
+            lalu ke halaman unggah bukti transfer. Jenis tiket mengikuti pengaturan Fast Track, bukan tahap yang sedang
+            berlangsung. Harga tetap dari tahap aktif. Pesanan mengurangi kuota dan tidak dibatalkan otomatis.
           </p>
         </div>
         <div className="grid gap-4">
@@ -213,7 +214,7 @@ function FastTrackPage() {
           <p className="mt-6 text-sm text-subtle">Isi jumlah tiket.</p>
         )}
         <Button type="submit" size="lg" className="mt-6 w-full" disabled={busy || !stage || activeTypes.length === 0 || totalQty < 1}>
-          {busy ? "Memproses…" : "Buat pesanan"}
+          {busy ? "Memproses…" : "Checkout"}
         </Button>
       </aside>
     </form>

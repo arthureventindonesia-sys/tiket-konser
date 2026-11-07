@@ -23,6 +23,7 @@ export type PublicOrder = {
   student: boolean;
   fastTrack: boolean;
   stageLabel: string | null;
+  payment: "Cash" | "QRIS";
   ticketPrice: TicketPrices;
   createdAt: string;
   confirmedAt: string | null;
@@ -63,6 +64,7 @@ export type TicketboxRecord = {
   stageLabel: string | null;
   student: boolean;
   fastTrack: boolean;
+  payment: "Cash" | "QRIS";
   ticketPrice: TicketPrices;
   liveStage: { id: string; label: string; price: Record<TicketTypeId, number> } | null;
   confirmedAt: string | null;

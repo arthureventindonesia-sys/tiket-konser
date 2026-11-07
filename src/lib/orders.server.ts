@@ -53,6 +53,7 @@ type OrderRow = {
   student?: boolean | null;
   student_card?: string | null;
   student_card_mime?: string | null;
+  payment_method?: string | null;
 };
 
 function qtyOf(row: Pick<OrderRow, "qty_vvip" | "qty_vip" | "qty_festival" | "qty_community">, type: TicketTypeId) {
@@ -126,6 +127,7 @@ async function toPublic(
     student: Boolean(row.student),
     fastTrack: Boolean(row.fast_track),
     stageLabel: row.stage_id ? (stageDef(row.stage_id)?.label ?? row.stage_id) : null,
+    payment: (row.payment_method === "cash" ? "Cash" : "QRIS") as "Cash" | "QRIS",
     ticketPrice: ticketPriceOf(row),
     createdAt: row.created_at,
     confirmedAt: row.confirmed_at,
@@ -511,7 +513,7 @@ export async function getPublicOrder(publicId: string): Promise<PublicOrder> {
       id, public_id, email, full_name, address, whatsapp, referral_code,
       qty_vvip, qty_vip, qty_festival, qty_community, base_amount, unique_code, total_amount,
       status, proof_mime, proof_name, confirmed_at, created_at, stage_id, student, fast_track,
-      price_vvip, price_vip, price_festival, price_community,
+      price_vvip, price_vip, price_festival, price_community, payment_method,
       case when proof_data is null or proof_data = '' then 0 else 1 end as has_proof_flag
     from orders
     where public_id = ${publicId}
@@ -638,7 +640,7 @@ export async function listAdminOrders(): Promise<AdminOrder[]> {
       id, public_id, email, full_name, address, whatsapp, referral_code,
       qty_vvip, qty_vip, qty_festival, qty_community, base_amount, unique_code, total_amount,
       status, proof_mime, proof_name, confirmed_at, created_at, stage_id, student, fast_track,
-      price_vvip, price_vip, price_festival, price_community,
+      price_vvip, price_vip, price_festival, price_community, payment_method,
       (proof_data is not null) as has_proof
     from orders
     order by
@@ -724,10 +726,12 @@ export async function listConfirmedExport(range?: {
     uniqueCode: number;
     totalAmount: number;
     referralCode: string;
+    payment: "Cash" | "QRIS";
     confirmedAt: string;
     createdAt: string;
   }[]
 > {
+  await ensureIdentitySchema();
   const sql = await getSql();
   const from = range?.from?.trim() ? new Date(`${range.from}T00:00:00+07:00`).toISOString() : null;
   const to = range?.to?.trim() ? new Date(`${range.to}T23:59:59.999+07:00`).toISOString() : null;
@@ -755,6 +759,7 @@ export async function listConfirmedExport(range?: {
       uniqueCode: pub.uniqueCode,
       totalAmount: pub.totalAmount,
       referralCode: pub.referralCode ?? "",
+      payment: (row.payment_method === "cash" ? "Cash" : "QRIS") as "Cash" | "QRIS",
       confirmedAt: pub.confirmedAt ?? "",
       createdAt: pub.createdAt,
     });
@@ -815,7 +820,7 @@ export function confirmationMessage(order: PublicOrder): string {
   const lines = order.tickets.map((t, i) => {
     const price = t.unitPrice ?? order.ticketPrice[t.type];
     const harga = price != null ? formatRupiah(price) : "harga tidak tercatat";
-    return `${i + 1}. ${t.code} (${TICKET_LABEL[t.type]})\nHarga tiket: ${harga}\nTahap pembelian: ${stage}${channel}`;
+    return `${i + 1}. ${t.code} (${TICKET_LABEL[t.type]})\nHarga tiket: ${harga}\nTahap pembelian: ${stage}${channel}\nPembayaran: ${order.payment}`;
   });
   return [
     `Halo ${order.fullName},`,
@@ -847,6 +852,7 @@ async function toTicketbox(row: OrderRow, queriedCode: string): Promise<Ticketbo
     stageLabel: pub.stageLabel,
     student: pub.student,
     fastTrack: pub.fastTrack,
+    payment: pub.payment,
     ticketPrice: pub.ticketPrice,
     liveStage: null,
     confirmedAt: pub.confirmedAt,

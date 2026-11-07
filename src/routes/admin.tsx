@@ -43,8 +43,11 @@ function AdminLayout() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (!pathname.startsWith("/admin")) return;
+    let cancelled = false;
     getStaffSession()
       .then((s) => {
+        if (cancelled) return;
         if (!s) {
           void navigate({ to: "/login" });
           return;
@@ -54,7 +57,12 @@ function AdminLayout() {
           void navigate({ to: staffHome(s.panels) });
         }
       })
-      .finally(() => setReady(true));
+      .finally(() => {
+        if (!cancelled) setReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [navigate, pathname]);
 
   if (!ready || !staff) {

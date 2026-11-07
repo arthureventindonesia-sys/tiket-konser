@@ -371,6 +371,8 @@ function KonfirmasiPage() {
                           {" · Tahap "}
                           {o.stageLabel ?? "tidak tercatat"}
                           {o.student ? " · Pelajar" : o.fastTrack ? " · Fast Track" : ""}
+                          {" · "}
+                          {o.payment}
                         </li>
                       ))}
                     </ul>
